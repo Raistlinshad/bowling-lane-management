@@ -1,4 +1,4 @@
-﻿#include <QApplication>
+#include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -11,8 +11,10 @@
 #include <QStackedWidget>
 #include <QPropertyAnimation>
 #include <QGraphicsOpacityEffect>
+#ifdef MULTIMEDIA_SUPPORT
 #include <QMediaPlayer>
 #include <QVideoWidget>
+#endif
 #include <QPixmap>
 #include <QJsonObject>
 #include <QJsonDocument>
@@ -28,208 +30,269 @@
 #include "BowlingWidgets.h"
 #include "MediaManager.h"
 
-// Forward declarations
-class BowlingMainWindow;
-
-
-// Bowler display widget
-class BowlerWidget : public QFrame {
+// Main bowling window
+class BowlingMainWindow : public QMainWindow {
     Q_OBJECT
     
 public:
-    BowlerWidget(const Bowler& bowler, bool isCurrentPlayer = false, QWidget* parent = nullptr) 
-        : QFrame(parent), bowlerData(bowler) {
-        setupUI(isCurrentPlayer);
-        updateDisplay();
-    }
-    
-    void updateBowler(const Bowler& bowler, bool isCurrentPlayer = false) {
-        bowlerData = bowler;
-        updateHighlight(isCurrentPlayer);
-        updateDisplay();
-    }
-    
-    void updateHighlight(bool isCurrentPlayer) {
-        if (isCurrentPlayer) {
-            setStyleSheet("QFrame { background-color: yellow; border: 3px solid red; }");
-        } else {
-            setStyleSheet("QFrame { background-color: lightblue; border: 1px solid black; }");
-        }
-    }
-
-private:
-    void setupUI(bool isCurrentPlayer) {
-        setFrameStyle(QFrame::Box);
-        updateHighlight(isCurrentPlayer);
-        
-        QGridLayout* layout = new QGridLayout(this);
-        
-        // Bowler name
-        nameLabel = new QLabel(bowlerData.name, this);
-        nameLabel->setFont(QFont("Arial", 20, QFont::Bold));
-        nameLabel->setAlignment(Qt::AlignCenter);
-        layout->addWidget(nameLabel, 0, 0, 1, 11);
-        
-        // Frame headers
-        QStringList headers = {"F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "Total"};
-        for (int i = 0; i < headers.size(); ++i) {
-            QLabel* header = new QLabel(headers[i], this);
-            header->setFont(QFont("Arial", 12, QFont::Bold));
-            header->setAlignment(Qt::AlignCenter);
-            header->setStyleSheet("QLabel { border: 1px solid black; background-color: lightgray; }");
-            layout->addWidget(header, 1, i);
-        }
-        
-        // Frame displays
-        frameLabels.resize(10);
-        totalLabels.resize(10);
-        
-        for (int i = 0; i < 10; ++i) {
-            // Ball results
-            frameLabels[i] = new QLabel(this);
-            frameLabels[i]->setAlignment(Qt::AlignCenter);
-            frameLabels[i]->setStyleSheet("QLabel { border: 1px solid black; background-color: white; }");
-            frameLabels[i]->setMinimumHeight(30);
-            layout->addWidget(frameLabels[i], 2, i);
-            
-            // Frame totals
-            totalLabels[i] = new QLabel(this);
-            totalLabels[i]->setAlignment(Qt::AlignCenter);
-            totalLabels[i]->setStyleSheet("QLabel { border: 1px solid black; background-color: white; }");
-            totalLabels[i]->setFont(QFont("Arial", 14, QFont::Bold));
-            totalLabels[i]->setMinimumHeight(40);
-            layout->addWidget(totalLabels[i], 3, i);
-        }
-        
-        // Total score
-        grandTotalLabel = new QLabel(this);
-        grandTotalLabel->setAlignment(Qt::AlignCenter);
-        grandTotalLabel->setStyleSheet("QLabel { border: 2px solid black; background-color: yellow; }");
-        grandTotalLabel->setFont(QFont("Arial", 24, QFont::Bold));
-        grandTotalLabel->setMinimumHeight(70);
-        layout->addWidget(grandTotalLabel, 2, 10, 2, 1);
-    }
-    
-    void updateDisplay() {
-        nameLabel->setText(bowlerData.name);
-        
-        for (int i = 0; i < 10; ++i) {
-            const Frame& frame = bowlerData.frames[i];
-            
-            // Update ball display
-            frameLabels[i]->setText(frame.getDisplayText());
-            
-            // Update frame total
-            if (frame.isComplete) {
-                totalLabels[i]->setText(QString::number(frame.totalScore));
-            } else if (!frame.balls.isEmpty()) {
-                totalLabels[i]->setText("...");
-            } else {
-                totalLabels[i]->setText("");
-            }
-        }
-        
-        // Update grand total
-        grandTotalLabel->setText(QString::number(bowlerData.totalScore));
-    }
-    
-    Bowler bowlerData;
-    QLabel* nameLabel;
-    QVector<QLabel*> frameLabels;
-    QVector<QLabel*> totalLabels;
-    QLabel* grandTotalLabel;
-};
-
-// Media display widget for ads and special effects
-class MediaDisplayWidget : public QStackedWidget {
-    Q_OBJECT
-    
-public:
-    MediaDisplayWidget(QWidget* parent = nullptr) : QStackedWidget(parent) {
+    BowlingMainWindow(QWidget* parent = nullptr) : QMainWindow(parent) {
         setupUI();
-        setupMediaRotation();
-    }
-    
-    void playSpecialEffect(const QString& effectName, int duration = 3000) {
-        qDebug() << "Playing special effect:" << effectName;
-        
-        if (effectName == "strike") {
-            showStrikeEffect();
-        } else if (effectName == "spare") {
-            showSpareEffect();
-        }
-        
-        // Return to game display after effect
-        QTimer::singleShot(duration, this, [this]() {
-            setCurrentIndex(0); // Return to game display
-        });
-    }
-    
-    void setGameWidget(QWidget* gameWidget) {
-        if (indexOf(gameWidget) == -1) {
-            insertWidget(0, gameWidget);
-        }
-        setCurrentIndex(0);
+        setupClient();
+        setupGame();
     }
 
 private slots:
-    void rotateMedia() {
-        if (currentIndex() == 0) return; // Don't rotate if showing game
-        
-        // Implement media rotation logic here
-        // For now, just cycle through available widgets
+    void onGameUpdated() {
+        updateGameDisplay();
     }
     
-    void showStrikeEffect() {
-        QLabel* strikeLabel = new QLabel("STRIKE!", this);
-        strikeLabel->setAlignment(Qt::AlignCenter);
-        strikeLabel->setStyleSheet("QLabel { background-color: red; color: white; font-size: 72px; font-weight: bold; }");
-        
-        addWidget(strikeLabel);
-        setCurrentWidget(strikeLabel);
-        
-        // Remove the label after use
-        QTimer::singleShot(3000, this, [this, strikeLabel]() {
-            removeWidget(strikeLabel);
-            strikeLabel->deleteLater();
-        });
+    void onSpecialEffect(const QString& effect) {
+        mediaDisplay->showEffect(effect);
     }
     
-    void showSpareEffect() {
-        QLabel* spareLabel = new QLabel("SPARE!", this);
-        spareLabel->setAlignment(Qt::AlignCenter);
-        spareLabel->setStyleSheet("QLabel { background-color: blue; color: white; font-size: 72px; font-weight: bold; }");
+    void onHoldClicked() {
+        game->holdGame();
+    }
+    
+    void onSkipClicked() {
+        game->skipPlayer();
+    }
+    
+    void onResetClicked() {
+        game->resetGame();
+    }
+    
+    void onCurrentPlayerChanged(const QString& playerName) {
+        updateGameStatus();
+    }
+    
+    void onGameCommand(const QString& type, const QJsonObject& data) {
+        qDebug() << "Received game command:" << type;
         
-        addWidget(spareLabel);
-        setCurrentWidget(spareLabel);
-        
-        // Remove the label after use
-        QTimer::singleShot(3000, this, [this, spareLabel]() {
-            removeWidget(spareLabel);
-            spareLabel->deleteLater();
-        });
+        if (type == "quick_game") {
+            game->startGame(data);
+        } else if (type == "status_update") {
+            sendGameStatus();
+        } else if (type == "player_update_add") {
+            QString playerName = data["player_name"].toString();
+            game->addPlayer(playerName);
+        } else if (type == "player_update_remove") {
+            QString playerName = data["player_name"].toString();
+            game->removePlayer(playerName);
+        } else if (type == "score_update") {
+            game->updateScore(data);
+        } else if (type == "hold_update") {
+            bool hold = data["hold"].toBool();
+            if (hold != game->isGameHeld()) {
+                game->holdGame();
+            }
+        } else if (type == "move_to") {
+            handleMoveToLane(data);
+        } else if (type == "scroll_update") {
+            updateScrollText(data["text"].toString());
+        }
     }
 
 private:
     void setupUI() {
-        // Default placeholder widget
-        QLabel* placeholder = new QLabel("Ready for Game", this);
-        placeholder->setAlignment(Qt::AlignCenter);
-        placeholder->setStyleSheet("QLabel { background-color: blue; color: white; font-size: 48px; }");
-        addWidget(placeholder);
+        setWindowTitle("Canadian 5-Pin Bowling");
+        setMinimumSize(1200, 800);
+        
+        QWidget* centralWidget = new QWidget(this);
+        setCentralWidget(centralWidget);
+        
+        QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
+        
+        // Media display area (blue background)
+        mediaDisplay = new MediaManager(this);
+        mediaDisplay->setMinimumHeight(400);
+        
+        // Game display area
+        gameDisplayArea = new QScrollArea(this);
+        gameDisplayArea->setWidgetResizable(true);
+        gameDisplayArea->setMinimumHeight(300);
+        
+        gameWidget = new QWidget();
+        gameLayout = new QVBoxLayout(gameWidget);
+        gameDisplayArea->setWidget(gameWidget);
+        
+        // Set game widget in media display
+        mediaDisplay->showGameDisplay(gameDisplayArea);
+        
+        // Game status area
+        gameStatus = new GameStatusWidget(this);
+        
+        // Button area
+        QHBoxLayout* buttonLayout = new QHBoxLayout();
+        
+        holdButton = new QPushButton("HOLD", this);
+        skipButton = new QPushButton("SKIP", this);
+        resetButton = new QPushButton("RESET", this);
+        
+        holdButton->setMinimumHeight(60);
+        skipButton->setMinimumHeight(60);
+        resetButton->setMinimumHeight(60);
+        
+        holdButton->setStyleSheet("QPushButton { font-size: 18px; font-weight: bold; }");
+        skipButton->setStyleSheet("QPushButton { font-size: 18px; font-weight: bold; }");
+        resetButton->setStyleSheet("QPushButton { font-size: 18px; font-weight: bold; }");
+        
+        connect(holdButton, &QPushButton::clicked, this, &BowlingMainWindow::onHoldClicked);
+        connect(skipButton, &QPushButton::clicked, this, &BowlingMainWindow::onSkipClicked);
+        connect(resetButton, &QPushButton::clicked, this, &BowlingMainWindow::onResetClicked);
+        
+        buttonLayout->addWidget(holdButton);
+        buttonLayout->addWidget(skipButton);
+        buttonLayout->addWidget(resetButton);
+        buttonLayout->addStretch();
+        
+        // Layout assembly
+        mainLayout->addWidget(mediaDisplay, 2);
+        mainLayout->addWidget(gameStatus, 0);
+        mainLayout->addLayout(buttonLayout, 0);
     }
     
-    void setupMediaRotation() {
-        mediaTimer = new QTimer(this);
-        connect(mediaTimer, &QTimer::timeout, this, &MediaDisplayWidget::rotateMedia);
-        mediaTimer->start(300000); // 5 minutes
+    void setupClient() {
+        // Load settings
+        QSettings settings("settings.ini", QSettings::IniFormat);
+        int laneId = settings.value("Lane/id", 1).toInt();
+        QString serverHost = settings.value("Server/host", "192.168.2.243").toString();
+        int serverPort = settings.value("Server/port", 50005).toInt();
+        
+        client = new LaneClient(laneId, this);
+        client->setServerAddress(serverHost, serverPort);
+        
+        connect(client, &LaneClient::gameCommandReceived, this, &BowlingMainWindow::onGameCommand);
+        
+        client->start();
     }
     
-    QTimer* mediaTimer;
-};
+    void setupGame() {
+        game = new QuickGame(this);
+        
+        connect(game, &QuickGame::gameUpdated, this, &BowlingMainWindow::onGameUpdated);
+        connect(game, &QuickGame::specialEffect, this, &BowlingMainWindow::onSpecialEffect);
+        connect(game, &QuickGame::currentPlayerChanged, this, &BowlingMainWindow::onCurrentPlayerChanged);
+        connect(game, &QuickGame::gameHeld, this, [this](bool held) {
+            holdButton->setText(held ? "RESUME" : "HOLD");
+            holdButton->setStyleSheet(held ? 
+                "QPushButton { background-color: red; color: white; font-size: 18px; font-weight: bold; }" :
+                "QPushButton { background-color: green; color: white; font-size: 18px; font-weight: bold; }");
+        });
+    }
+    
+    void sendGameStatus() {
+        QJsonObject status;
+        status["type"] = "game_status";
+        status["lane_id"] = client->getLaneId();
+        status["current_player"] = game->getCurrentBowler().name;
+        status["game_held"] = game->isGameHeld();
+        status["frame"] = game->getCurrentBowler().currentFrame + 1;
+        status["ball"] = game->getCurrentBowler().getCurrentFrame().balls.size() + 1;
+        
+        QJsonArray bowlersArray;
+        for (const Bowler& bowler : game->getBowlers()) {
+            QJsonObject bowlerObj;
+            bowlerObj["name"] = bowler.name;
+            bowlerObj["total_score"] = bowler.totalScore;
+            bowlerObj["current_frame"] = bowler.currentFrame + 1;
+            bowlersArray.append(bowlerObj);
+        }
+        status["bowlers"] = bowlersArray;
+        
+        client->sendMessage(status);
+    }
+    
+    void handleMoveToLane(const QJsonObject& data) {
+        QJsonObject gameState;
+        gameState["bowlers"] = serializeBowlers();
+        gameState["current_bowler"] = game->getCurrentBowlerIndex();
+        gameState["held"] = game->isGameHeld();
+        
+        QJsonObject moveMessage;
+        moveMessage["type"] = "game_state_transfer";
+        moveMessage["target_lane"] = data["target_lane"];
+        moveMessage["game_data"] = gameState;
+        
+        client->sendMessage(moveMessage);
+        game->resetGame();
+    }
+    
+    QJsonArray serializeBowlers() {
+        QJsonArray bowlersArray;
+        for (const Bowler& bowler : game->getBowlers()) {
+            bowlersArray.append(bowler.toJson());
+        }
+        return bowlersArray;
+    }
+    
+    void updateScrollText(const QString& text) {
+        if (!scrollLabel) {
+            scrollLabel = new QLabel(this);
+            scrollLabel->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 16px; padding: 5px; }");
+            static_cast<QVBoxLayout*>(centralWidget()->layout())->addWidget(scrollLabel);
+        }
+        scrollLabel->setText(text);
+    }
+    
+    void updateGameDisplay() {
+        // Clear existing bowler widgets
+        QLayoutItem* item;
+        while ((item = gameLayout->takeAt(0)) != nullptr) {
+            delete item->widget();
+            delete item;
+        }
+        
+        const QVector<Bowler>& bowlers = game->getBowlers();
+        int currentIdx = game->getCurrentBowlerIndex();
+        
+        // Display up to 6 bowlers, prioritizing current player
+        QVector<int> displayOrder;
+        
+        if (!bowlers.isEmpty()) {
+            displayOrder.append(currentIdx);
+        }
+        
+        for (int i = 0; i < bowlers.size() && displayOrder.size() < 6; ++i) {
+            if (i != currentIdx) {
+                displayOrder.append(i);
+            }
+        }
+        
+        // Create bowler widgets
+        for (int i = 0; i < displayOrder.size(); ++i) {
+            int bowlerIdx = displayOrder[i];
+            bool isCurrent = (bowlerIdx == currentIdx);
+            
+            BowlerWidget* bowlerWidget = new BowlerWidget(bowlers[bowlerIdx], isCurrent);
+            gameLayout->addWidget(bowlerWidget);
+        }
+        
+        gameLayout->addStretch();
+        updateGameStatus();
+    }
+    
+    void updateGameStatus() {
+        if (game->getBowlers().isEmpty()) {
+            gameStatus->resetStatus();
+            return;
+        }
+        
+        const Bowler& currentBowler = game->getCurrentBowler();
+        const Frame& currentFrame = currentBowler.getCurrentFrame();
+        
+        QVector<int> pinStates = game->getCurrentPinStates();
+        
+        gameStatus->updateStatus(
+            currentBowler.name,
+            currentBowler.currentFrame,
+            currentFrame.balls.size(),
+            pinStates
+        );
+    }
 
-private:
-    MediaDisplayWidget* mediaDisplay;
+    // UI Components
+    MediaManager* mediaDisplay;
     QScrollArea* gameDisplayArea;
     QWidget* gameWidget;
     QVBoxLayout* gameLayout;
@@ -248,7 +311,6 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     
-    // Set application properties
     app.setApplicationName("Canadian5PinBowling");
     app.setApplicationVersion("1.0");
     app.setOrganizationName("BowlingCenter");
