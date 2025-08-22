@@ -108,7 +108,7 @@ private:
     
     QProcess* pythonProcess;
     QTimer* heartbeatTimer;
-    bool machineReady;
+    bool machineIsReady;
     QString lastError;
 };
 

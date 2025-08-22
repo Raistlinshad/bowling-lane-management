@@ -220,7 +220,7 @@ void Bowler::fromJson(const QJsonObject& json) {
 
 // MachineInterface class implementation
 MachineInterface::MachineInterface(QObject* parent) 
-    : QObject(parent), pythonProcess(nullptr), heartbeatTimer(nullptr), machineReady(false) {
+    : QObject(parent), pythonProcess(nullptr), heartbeatTimer(nullptr), machineIsReady(false) {
     setupProcess();
 }
 
@@ -275,12 +275,12 @@ void MachineInterface::stopDetection() {
         heartbeatTimer->stop();
     }
     
-    machineReady = false;
+    machineIsReady = false;
     emit machineStatusChanged("stopped");
 }
 
 bool MachineInterface::isRunning() const {
-    return pythonProcess && pythonProcess->state() == QProcess::Running && machineReady;
+    return pythonProcess && pythonProcess->state() == QProcess::Running && machineIsReady;
 }
 
 void MachineInterface::sendCommand(const QString& command, const QJsonObject& data) {
@@ -306,7 +306,7 @@ void MachineInterface::sendCommand(const QString& command, const QJsonObject& da
 void MachineInterface::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     Q_UNUSED(exitStatus)
     
-    machineReady = false;
+    machineIsReady = false;
     heartbeatTimer->stop();
     
     if (exitCode != 0) {
@@ -342,7 +342,7 @@ void MachineInterface::onErrorOccurred(QProcess::ProcessError error) {
             break;
     }
     
-    machineReady = false;
+    machineIsReady = false;
     emit machineError(errorString);
     emit machineStatusChanged("error");
 }
@@ -371,8 +371,8 @@ void MachineInterface::processMachineOutput(const QString& line) {
             emit ballDetected(pins);
         }
     } else if (type == "machine_ready") {
-        machineReady = true;
-        emit machineReady();
+        machineIsReady = true;
+        emit machineIsReady();
         emit machineStatusChanged("ready");
     } else if (type == "error") {
         lastError = obj["message"].toString();
@@ -380,8 +380,8 @@ void MachineInterface::processMachineOutput(const QString& line) {
     } else if (type == "pong") {
         // Heartbeat response - connection is alive
     } else if (type == "status") {
-        machineReady = obj["machine_initialized"].toBool() && obj["detection_active"].toBool();
-        emit machineStatusChanged(machineReady ? "ready" : "not_ready");
+        machineIsReady = obj["machine_initialized"].toBool() && obj["detection_active"].toBool();
+        emit machineStatusChanged(machineIsReady ? "ready" : "not_ready");
     }
 }
 
@@ -394,7 +394,7 @@ QuickGame::QuickGame(QObject* parent)
     
     connect(machine, &MachineInterface::ballDetected, this, &QuickGame::onBallDetected);
     connect(machine, &MachineInterface::machineError, this, &QuickGame::onMachineError);
-    connect(machine, &MachineInterface::machineReady, this, &QuickGame::onMachineReady);
+    connect(machine, &MachineInterface::machineIsReady, this, &QuickGame::onMachineIsReady);
     
     gameTimer = new QTimer(this);
     gameTimer->setSingleShot(false);
@@ -761,7 +761,7 @@ void QuickGame::onMachineError(const QString& error) {
     emit errorOccurred(error);
 }
 
-void QuickGame::onMachineReady() {
+void QuickGame::onMachineIsReady() {
     qDebug() << "Machine interface ready";
 }
 
