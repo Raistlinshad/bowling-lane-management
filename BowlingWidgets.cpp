@@ -166,7 +166,7 @@ QRect PinDisplayWidget::getPinRect(int pinIndex) const {
 GameStatusWidget::GameStatusWidget(QWidget* parent) : QFrame(parent) {
     setupUI();
     setFrameStyle(QFrame::Box);
-    setStyleSheet("QFrame { background-color: darkblue; color: white; }");
+    QFrame::setStyleSheet("QFrame { background-color: darkblue; color: white; }");
 }
 
 void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ball, const QVector<int>& pinStates) {
@@ -776,4 +776,5 @@ void ScrollTextWidget::onScrollTimer() {
 void ScrollTextWidget::calculateScrollParameters() {
     QFontMetrics fm(scrollFont);
     textWidth = fm.horizontalAdvance(scrollText);
+
 }
