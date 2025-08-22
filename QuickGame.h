@@ -67,6 +67,10 @@ public:
     bool isComplete() const;
     Frame& getCurrentFrame();
     const Frame& getCurrentFrame() const;
+
+    bool operator==(const Bowler& other) const {
+    return name == other.name;
+    }
     
     // Game state methods
     void nextFrame();
@@ -252,5 +256,6 @@ private:
     static const int STRIKE_VALUE = 15;
     static const int SPARE_VALUE = 15;
 };
+
 
 #endif // QUICKGAME_H
