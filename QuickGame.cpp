@@ -394,7 +394,7 @@ QuickGame::QuickGame(QObject* parent)
     
     connect(machine, &MachineInterface::ballDetected, this, &QuickGame::onBallDetected);
     connect(machine, &MachineInterface::machineError, this, &QuickGame::onMachineError);
-    connect(machine, &MachineInterface::machineReady, this, &QuickGame::onMachineIsReady);
+    connect(machine, &MachineInterface::machineReady, this, &QuickGame::onMachineReady);
     
     gameTimer = new QTimer(this);
     gameTimer->setSingleShot(false);
@@ -961,4 +961,5 @@ bool QuickGame::validateBowlerData(const Bowler& bowler) const {
     }
     
     return true;
+
 }
