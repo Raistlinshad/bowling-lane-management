@@ -1,5 +1,5 @@
-﻿vcmake_minimum_required(VERSION 3.16)
-project(Canadian5PinBowling VERSION 1.0.0)
+# ﻿vcmake_minimum_required(VERSION 3.16)
+# project(Canadian5PinBowling VERSION 1.0.0)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -260,5 +260,6 @@ else()
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Bowling Center <admin@bowlingcenter.com>")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt5-default, python3, python3-rpi.gpio")
 endif()
+
 
 include(CPack)
