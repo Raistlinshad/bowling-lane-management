@@ -1,4 +1,4 @@
-# ﻿vcmake_minimum_required(VERSION 3.16)
+﻿# vcmake_minimum_required(VERSION 3.16)
 # project(Canadian5PinBowling VERSION 1.0.0)
 
 # Set C++ standard
@@ -51,6 +51,7 @@ add_definitions(${Qt5MultimediaWidgets_DEFINITIONS})
 
 # Source files
 set(SOURCES
+    client_main.cpp
     main.cpp
     LaneClient.cpp
     QuickGame.cpp
@@ -260,6 +261,5 @@ else()
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Bowling Center <admin@bowlingcenter.com>")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "qt5-default, python3, python3-rpi.gpio")
 endif()
-
 
 include(CPack)
