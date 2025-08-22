@@ -372,7 +372,7 @@ void MachineInterface::processMachineOutput(const QString& line) {
         }
     } else if (type == "machine_ready") {
         machineIsReady = true;
-        emit machineIsReady();
+        emit machineReady();
         emit machineStatusChanged("ready");
     } else if (type == "error") {
         lastError = obj["message"].toString();
@@ -394,7 +394,7 @@ QuickGame::QuickGame(QObject* parent)
     
     connect(machine, &MachineInterface::ballDetected, this, &QuickGame::onBallDetected);
     connect(machine, &MachineInterface::machineError, this, &QuickGame::onMachineError);
-    connect(machine, &MachineInterface::machineIsReady, this, &QuickGame::onMachineIsReady);
+    connect(machine, &MachineInterface::machineReady, this, &QuickGame::onMachineIsReady);
     
     gameTimer = new QTimer(this);
     gameTimer->setSingleShot(false);
@@ -761,7 +761,7 @@ void QuickGame::onMachineError(const QString& error) {
     emit errorOccurred(error);
 }
 
-void QuickGame::onMachineIsReady() {
+void QuickGame::onMachineReady() {
     qDebug() << "Machine interface ready";
 }
 

@@ -79,6 +79,7 @@ public:
     // Serialization
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);
+
 };
 
 // Machine interface for communicating with Python ball detector
@@ -139,6 +140,8 @@ public:
     void holdGame();
     void skipPlayer();
     void skipFrame();
+
+    static const QVector<int> PIN_VALUES;  // {2, 3, 5, 3, 2}
     
     // Score management
     void updateScore(const QJsonObject& scoreData);
@@ -251,11 +254,9 @@ private:
     static const int PERFECT_SCORE = 450;  // 15 * 30 (10 strikes + 20 bonus balls)
     
     // Canadian 5-pin specific constants
-    static const QVector<int> PIN_VALUES;  // {2, 3, 5, 3, 2}
     static const int TOTAL_PIN_VALUE = 15;
     static const int STRIKE_VALUE = 15;
     static const int SPARE_VALUE = 15;
 };
-
 
 #endif // QUICKGAME_H
