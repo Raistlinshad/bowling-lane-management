@@ -61,6 +61,7 @@ public:
     void removeEffect(const QString& name);
     
     QStringList getAvailableEffects() const;
+    QStackedWidget* effectContainer;
 
 signals:
     void effectStarted(const QString& effectName);
@@ -75,7 +76,6 @@ private:
     void showVideoEffect(const QString& filePath, int duration);
     void showImageEffect(const QString& filePath, int duration);
     
-    QStackedWidget* effectContainer;
     QTimer* effectTimer;
     QMap<QString, QString> customEffects;  // name -> file path
     QString currentEffect;
@@ -100,6 +100,7 @@ public:
     void stopRotation();
     void pauseRotation();
     void resumeRotation();
+    void selectNextMedia();
     
     MediaItem getCurrentItem() const;
     QStringList getMediaList() const;
@@ -115,7 +116,6 @@ signals:
 
 private slots:
     void onRotationTimer();
-    void selectNextMedia();
 
 private:
     QVector<MediaItem> mediaItems;

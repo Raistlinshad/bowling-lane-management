@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QSettings>
+#include <QVBoxLayout>
 
 // Static constants
 const QStringList MediaManager::supportedVideoFormats = {"mp4", "avi", "mov", "mkv", "wmv", "flv"};
@@ -261,7 +262,7 @@ void MediaRotationManager::onRotationTimer() {
 void MediaRotationManager::selectNextMedia() {
     if (mediaItems.isEmpty()) return;
     
-    MediaItem nextItem;
+    MediaItem nextItem("", MediaType::Image, 0);
     
     if (rotationMode == "random") {
         nextItem = selectRandomMedia();
@@ -340,8 +341,8 @@ MediaDownloadManager::MediaDownloadManager(QObject* parent)
 }
 
 void MediaDownloadManager::downloadMedia(const QString& url, const QString& localPath) {
-    QNetworkRequest request(QUrl(url));
-    request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
+    QNetworkRequest request{QUrl(url)};
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     
     QNetworkReply* reply = networkManager->get(request);
     
@@ -408,7 +409,7 @@ void MediaDownloadManager::onDownloadError(QNetworkReply::NetworkError error) {
 MediaManager::MediaManager(QWidget* parent) 
     : QStackedWidget(parent), gameDisplayIndex(-1), mediaDisplayIndex(-1), 
       effectDisplayIndex(-1), effectsEnabled(true), imageDuration(300), 
-      rotationMode("sequential") {
+      rotationMode("sequential"), currentMediaItem("", MediaType::Image, 0) {
     
     setupUI();
     setupMediaPlayer();
