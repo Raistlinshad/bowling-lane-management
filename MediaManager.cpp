@@ -475,7 +475,8 @@ void MediaManager::createDisplayWidgets() {
     addWidget(videoDisplayWidget);
     
     // Effect display (uses the effect manager's container)
-    effectDisplayIndex = addWidget(effectManager->effectContainer);
+    // effectDisplayIndex = addWidget(effectManager->effectContainer);
+    effectDisplayIndex = addWidget(new QLabel("Effects Disabled", this));
     
     // Start with game display
     setCurrentIndex(gameDisplayIndex);
@@ -729,4 +730,5 @@ MediaType MediaManager::getMediaType(const QString& filePath) const {
     }
     
     return MediaType::Image; // Default
+
 }
