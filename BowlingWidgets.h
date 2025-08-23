@@ -281,6 +281,8 @@ private:
     QFont scrollFont;
 };
 
+/*
+
 // Main bowling display widget that combines all components
 class BowlingDisplayWidget : public QWidget {
     Q_OBJECT
@@ -456,5 +458,7 @@ private:
     QLabel* tournamentStatus;
     QWidget* standingsWidget;
 };
+
+*/
 
 #endif // BOWLINGWIDGETS_H
