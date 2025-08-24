@@ -18,7 +18,7 @@ enum class ClientConnectionState {
     Reconnecting
 };
 
-ConnectionState m_connectionState;
+ClientConnectionState m_connectionState;
 int m_reconnectAttempts;
 QTimer* m_reconnectTimer;
 
@@ -100,5 +100,6 @@ private:
     static const int DISCOVERY_INTERVAL = 30000;     // 30 seconds
     static const int MAX_RECONNECT_ATTEMPTS = 10;
 };
+
 
 #endif // LANECLIENT_H
