@@ -267,7 +267,7 @@ QRect PinDisplayWidget::getPinRect(int pinIndex) const {
     int y = static_cast<int>(pos.y() * widgetSize.height() - pinSize / 2);
     
     return QRect(x, y, pinSize, pinSize);
-}turn QRect(x, y, pinSize, pinSize);
+}
 
 // GameStatusWidget implementation - FIXED
 GameStatusWidget::GameStatusWidget(QWidget* parent) : QFrame(parent) {
@@ -958,4 +958,5 @@ void ScrollTextWidget::onScrollTimer() {
 void ScrollTextWidget::calculateScrollParameters() {
     QFontMetrics fm(scrollFont);
     textWidth = fm.horizontalAdvance(scrollText);
+
 }
