@@ -1,4 +1,4 @@
-#include <QApplication>
+﻿#include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -35,10 +35,13 @@ class BowlingMainWindow : public QMainWindow {
     Q_OBJECT
     
 public:
-    BowlingMainWindow(QWidget* parent = nullptr) : QMainWindow(parent) {
+    BowlingMainWindow(QWidget* parent = nullptr) : QMainWindow(parent), 
+        gameActive(false), currentGameNumber(1) {
         setupUI();
         setupClient();
         setupGame();
+        applyDarkTheme();
+        loadGameColors();
     }
 
 private slots:
@@ -51,39 +54,66 @@ private slots:
     }
     
     void onHoldClicked() {
-        game->holdGame();
+        if (gameActive) {
+            game->holdGame();
+        }
     }
     
     void onSkipClicked() {
-        game->skipPlayer();
+        if (gameActive) {
+            game->skipPlayer();
+        }
     }
     
     void onResetClicked() {
-        game->resetGame();
+        if (gameActive) {
+            game->resetGame();
+        }
     }
     
     void onCurrentPlayerChanged(const QString& playerName) {
         updateGameStatus();
     }
     
+    void onGameStarted() {
+        gameActive = true;
+        showGameInterface();
+        applyGameColors();
+    }
+    
+    void onGameEnded(const QJsonObject& results) {
+        Q_UNUSED(results)
+        gameActive = false;
+        currentGameNumber++;
+        hideGameInterface();
+        mediaDisplay->showMediaRotation(); // Return to media rotation
+    }
+    
     void onGameCommand(const QString& type, const QJsonObject& data) {
         qDebug() << "Received game command:" << type;
         
         if (type == "quick_game") {
+            currentGameType = "quick_game";
+            game->startGame(data);
+        } else if (type == "league_game") {
+            currentGameType = "league_game";
+            game->startGame(data);
+        } else if (type == "tournament_game") {
+            currentGameType = "tournament_game";
             game->startGame(data);
         } else if (type == "status_update") {
             sendGameStatus();
         } else if (type == "player_update_add") {
             QString playerName = data["player_name"].toString();
-            game->addPlayer(playerName);
+            if (gameActive) game->addPlayer(playerName);
         } else if (type == "player_update_remove") {
             QString playerName = data["player_name"].toString();
-            game->removePlayer(playerName);
+            if (gameActive) game->removePlayer(playerName);
         } else if (type == "score_update") {
-            game->updateScore(data);
+            if (gameActive) game->updateScore(data);
         } else if (type == "hold_update") {
             bool hold = data["hold"].toBool();
-            if (hold != game->isGameHeld()) {
+            if (gameActive && hold != game->isGameHeld()) {
                 game->holdGame();
             }
         } else if (type == "move_to") {
@@ -103,26 +133,40 @@ private:
         
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
         
-        // Media display area (blue background)
+        // Media display area (full screen when no game)
         mediaDisplay = new MediaManager(this);
-        mediaDisplay->setMinimumHeight(400);
+        mediaDisplay->setMinimumHeight(600);
+        
+        // Game interface container (hidden by default)
+        gameInterfaceWidget = new QWidget(this);
+        gameInterfaceWidget->hide();
+        setupGameInterface();
+        
+        // Layout assembly
+        mainLayout->addWidget(mediaDisplay, 1);
+        mainLayout->addWidget(gameInterfaceWidget, 0);
+        
+        // Start with media display only
+        mediaDisplay->showMediaRotation();
+    }
+    
+    void setupGameInterface() {
+        QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
         
         // Game display area
         gameDisplayArea = new QScrollArea(this);
         gameDisplayArea->setWidgetResizable(true);
-        gameDisplayArea->setMinimumHeight(300);
+        gameDisplayArea->setMinimumHeight(250);
+        gameDisplayArea->setMaximumHeight(350);
         
         gameWidget = new QWidget();
-        gameLayout = new QVBoxLayout(gameWidget);
+        gameWidgetLayout = new QVBoxLayout(gameWidget);
         gameDisplayArea->setWidget(gameWidget);
         
-        // Set game widget in media display
-        mediaDisplay->showGameDisplay(gameDisplayArea);
-        
-        // Game status area
+        // Game status area (includes pin display)
         gameStatus = new GameStatusWidget(this);
         
-        // Button area
+        // Control buttons area
         QHBoxLayout* buttonLayout = new QHBoxLayout();
         
         holdButton = new QPushButton("HOLD", this);
@@ -146,10 +190,25 @@ private:
         buttonLayout->addWidget(resetButton);
         buttonLayout->addStretch();
         
-        // Layout assembly
-        mainLayout->addWidget(mediaDisplay, 2);
-        mainLayout->addWidget(gameStatus, 0);
-        mainLayout->addLayout(buttonLayout, 0);
+        // Assemble game interface
+        gameLayout->addWidget(gameDisplayArea, 1);
+        gameLayout->addWidget(gameStatus, 0);
+        gameLayout->addLayout(buttonLayout, 0);
+    }
+    
+    void showGameInterface() {
+        // Shrink media display to make room for game interface
+        mediaDisplay->setMaximumHeight(400);
+        gameInterfaceWidget->show();
+        
+        // Show the game display in media area
+        mediaDisplay->showGameDisplay(gameDisplayArea);
+    }
+    
+    void hideGameInterface() {
+        // Hide game interface and expand media display
+        gameInterfaceWidget->hide();
+        mediaDisplay->setMaximumHeight(QWIDGETSIZE_MAX);
     }
     
     void setupClient() {
@@ -173,6 +232,8 @@ private:
         connect(game, &QuickGame::gameUpdated, this, &BowlingMainWindow::onGameUpdated);
         connect(game, &QuickGame::specialEffect, this, &BowlingMainWindow::onSpecialEffect);
         connect(game, &QuickGame::currentPlayerChanged, this, &BowlingMainWindow::onCurrentPlayerChanged);
+        connect(game, &QuickGame::gameStarted, this, &BowlingMainWindow::onGameStarted);
+        connect(game, &QuickGame::gameEnded, this, &BowlingMainWindow::onGameEnded);
         connect(game, &QuickGame::gameHeld, this, [this](bool held) {
             holdButton->setText(held ? "RESUME" : "HOLD");
             holdButton->setStyleSheet(held ? 
@@ -181,7 +242,100 @@ private:
         });
     }
     
+    void applyDarkTheme() {
+        // Apply dark theme to entire application
+        QString darkStyle = R"(
+            QMainWindow {
+                background-color: #2b2b2b;
+                color: #ffffff;
+            }
+            QWidget {
+                background-color: #2b2b2b;
+                color: #ffffff;
+            }
+            QFrame {
+                background-color: #3c3c3c;
+                border: 1px solid #555555;
+            }
+            QLabel {
+                background-color: transparent;
+                color: #ffffff;
+            }
+            QScrollArea {
+                background-color: #2b2b2b;
+                border: 1px solid #555555;
+            }
+            QPushButton {
+                background-color: #4a4a4a;
+                border: 2px solid #666666;
+                padding: 5px;
+                color: #ffffff;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #5a5a5a;
+                border-color: #777777;
+            }
+            QPushButton:pressed {
+                background-color: #3a3a3a;
+            }
+        )";
+        
+        setStyleSheet(darkStyle);
+    }
+    
+    void loadGameColors() {
+        QSettings settings("settings.ini", QSettings::IniFormat);
+        settings.beginGroup("GameColors");
+        
+        gameColors.clear();
+        for (int i = 1; i <= 6; ++i) {
+            QString bgKey = QString("Game%1_Background").arg(i);
+            QString fgKey = QString("Game%1_Foreground").arg(i);
+            
+            ColorScheme scheme;
+            scheme.background = settings.value(bgKey, "blue").toString();
+            scheme.foreground = settings.value(fgKey, "white").toString();
+            gameColors.append(scheme);
+        }
+        
+        settings.endGroup();
+    }
+    
+    void applyGameColors() {
+        if (gameColors.isEmpty()) return;
+        
+        // Use modulo to cycle through colors
+        int colorIndex = (currentGameNumber - 1) % gameColors.size();
+        const ColorScheme& scheme = gameColors[colorIndex];
+        
+        // Apply colors to game interface elements
+        QString gameStyle = QString(R"(
+            #gameInterfaceWidget {
+                background-color: %1;
+                color: %2;
+            }
+            #gameInterfaceWidget QLabel {
+                background-color: transparent;
+                color: %2;
+            }
+            #gameInterfaceWidget QFrame {
+                background-color: %1;
+                color: %2;
+                border: 2px solid %2;
+            }
+        )").arg(scheme.background, scheme.foreground);
+        
+        gameInterfaceWidget->setObjectName("gameInterfaceWidget");
+        gameInterfaceWidget->setStyleSheet(gameStyle);
+        
+        // Update game status widget colors
+        gameStatus->setStyleSheet(scheme.background, scheme.foreground);
+    }
+    
     void sendGameStatus() {
+        if (!gameActive || !game) return;
+        
         QJsonObject status;
         status["type"] = "game_status";
         status["lane_id"] = client->getLaneId();
@@ -204,6 +358,8 @@ private:
     }
     
     void handleMoveToLane(const QJsonObject& data) {
+        if (!gameActive) return;
+        
         QJsonObject gameState;
         gameState["bowlers"] = serializeBowlers();
         gameState["current_bowler"] = game->getCurrentBowlerIndex();
@@ -236,9 +392,11 @@ private:
     }
     
     void updateGameDisplay() {
+        if (!gameActive || !game) return;
+        
         // Clear existing bowler widgets
         QLayoutItem* item;
-        while ((item = gameLayout->takeAt(0)) != nullptr) {
+        while ((item = gameWidgetLayout->takeAt(0)) != nullptr) {
             delete item->widget();
             delete item;
         }
@@ -265,15 +423,15 @@ private:
             bool isCurrent = (bowlerIdx == currentIdx);
             
             BowlerWidget* bowlerWidget = new BowlerWidget(bowlers[bowlerIdx], isCurrent);
-            gameLayout->addWidget(bowlerWidget);
+            gameWidgetLayout->addWidget(bowlerWidget);
         }
         
-        gameLayout->addStretch();
+        gameWidgetLayout->addStretch();
         updateGameStatus();
     }
     
     void updateGameStatus() {
-        if (game->getBowlers().isEmpty()) {
+        if (!gameActive || !game || game->getBowlers().isEmpty()) {
             gameStatus->resetStatus();
             return;
         }
@@ -291,11 +449,18 @@ private:
         );
     }
 
+    // Data members
+    struct ColorScheme {
+        QString background;
+        QString foreground;
+    };
+    
     // UI Components
     MediaManager* mediaDisplay;
+    QWidget* gameInterfaceWidget;
     QScrollArea* gameDisplayArea;
     QWidget* gameWidget;
-    QVBoxLayout* gameLayout;
+    QVBoxLayout* gameWidgetLayout;
     GameStatusWidget* gameStatus;
     
     QPushButton* holdButton;
@@ -305,6 +470,12 @@ private:
     
     LaneClient* client;
     QuickGame* game;
+    
+    // Game state
+    bool gameActive;
+    QString currentGameType;
+    int currentGameNumber;
+    QVector<ColorScheme> gameColors;
 };
 
 int main(int argc, char *argv[])

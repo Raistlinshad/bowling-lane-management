@@ -61,8 +61,8 @@ void LaneClient::start()
     qDebug() << "Starting lane client for lane" << m_laneId;
     
     // Start server discovery
-    startServerDiscovery();
-    m_discoveryTimer->start();
+    // startServerDiscovery();
+    // m_discoveryTimer->start();
     
     // Attempt initial connection
     connectToServer();
@@ -144,10 +144,16 @@ void LaneClient::onError(QAbstractSocket::SocketError error)
 {
     qWarning() << "Socket error:" << error << m_socket->errorString();
     
-    if (m_connectionState == ClientConnectionState::Connecting ||
-        m_connectionState == ClientConnectionState::Connected) {
-        setConnectionState(ClientConnectionState::Reconnecting);
-        m_reconnectTimer->start();
+    if (m_connectionState == ConnectionState::Connected || 
+        m_connectionState == ConnectionState::Connecting) {
+        m_connectionState = ConnectionState::Reconnecting;
+        m_registered = false;
+        m_heartbeatTimer->stop();
+        
+        // Start reconnection with backoff
+        int delay = std::min(1000 * (1 << m_reconnectAttempts), 30000);
+        m_reconnectTimer->start(delay);
+        m_reconnectAttempts++;
     }
 }
 
@@ -235,7 +241,7 @@ void LaneClient::sendRegistration()
 {
     QJsonObject registration;
     registration["type"] = "registration";
-    registration["lane_id"] = m_laneId;
+    registration["lane_id"] = QString::number(m_laneId);
     registration["client_ip"] = getLocalIpAddress();
     registration["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     
@@ -253,6 +259,12 @@ void LaneClient::sendHeartbeat()
 {
     if (!m_registered) {
         m_heartbeatTimer->stop();
+        return;
+    }
+
+    if (!validateConnection()) {
+        qWarning() << "Connection validation failed during heartbeat";
+        // Trigger reconnection logic here
         return;
     }
     
@@ -296,7 +308,7 @@ void LaneClient::attemptReconnection()
 void LaneClient::startServerDiscovery()
 {
     qDebug() << "Starting server discovery";
-    
+
     // Bind to discovery port
     if (!m_discoverySocket->bind(QHostAddress::Any, 50005, QUdpSocket::ShareAddress)) {
         qWarning() << "Failed to bind discovery socket";
@@ -403,4 +415,18 @@ void LaneClient::sendStatusUpdate(const QString &status)
     message["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     
     sendMessage(message);
+}
+
+bool LaneClient::validateConnection()
+{
+    if (!m_socket || m_socket->state() != QTcpSocket::ConnectedState) {
+        return false;
+    }
+    
+    // Send ping and wait for response with timeout
+    QJsonObject ping;
+    ping["type"] = "ping";
+    ping["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    
+    return sendMessage(ping); // Add timeout logic here
 }

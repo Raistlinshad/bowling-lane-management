@@ -8,11 +8,11 @@
 
 // Static constants for PinDisplayWidget
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
-    QPointF(0.2, 0.6),   // lTwo (left)
-    QPointF(0.5, 0.2),   // lThree (top)
-    QPointF(0.5, 0.5),   // cFive (center)
-    QPointF(0.5, 0.8),   // rThree (bottom)
-    QPointF(0.8, 0.6)    // rTwo (right)
+    QPointF(0.15, 0.3),   // lTwo (top-left)
+    QPointF(0.35, 0.15),  // lThree (upper-left) 
+    QPointF(0.5, 0.6),    // cFive (bottom-center)
+    QPointF(0.65, 0.15),  // rThree (upper-right)
+    QPointF(0.85, 0.3)    // rTwo (top-right)
 };
 
 const QStringList PinDisplayWidget::pinNames = {"L2", "L3", "C5", "R3", "R2"};
@@ -20,13 +20,22 @@ const QVector<int> PinDisplayWidget::pinValues = {2, 3, 5, 3, 2};
 
 // PinDisplayWidget implementation
 PinDisplayWidget::PinDisplayWidget(QWidget* parent) 
-    : QWidget(parent), displayMode("large"), upColor("white"), downColor("black"), 
+    : QWidget(parent), displayMode("large"), upColor("#87CEEB"), downColor("#2F4F4F"), 
       pinAnimation(nullptr), isAnimating(false) {
     
     pinStates.resize(5);
     resetPins();
     setupPinLayout();
     setMinimumSize(200, 150);
+    
+    // Dark theme styling
+    setStyleSheet(R"(
+        PinDisplayWidget {
+            background-color: #1a1a1a;
+            border: 2px solid #444444;
+            border-radius: 10px;
+        }
+    )");
 }
 
 void PinDisplayWidget::setPinStates(const QVector<int>& states) {
@@ -53,7 +62,7 @@ void PinDisplayWidget::animatePinFall(const QVector<int>& beforeStates, const QV
     }
     
     isAnimating = true;
-    pinAnimation->setDuration(1000);
+    pinAnimation->setDuration(1200);
     pinAnimation->setEasingCurve(QEasingCurve::OutBounce);
     pinAnimation->setStartValue(0.0);
     pinAnimation->setEndValue(1.0);
@@ -66,9 +75,9 @@ void PinDisplayWidget::setDisplayMode(const QString& mode) {
     if (mode == "large") {
         setMinimumSize(200, 150);
     } else if (mode == "small") {
-        setMinimumSize(120, 90);
+        setMinimumSize(140, 105);
     } else if (mode == "mini") {
-        setMinimumSize(80, 60);
+        setMinimumSize(100, 75);
     }
     
     update();
@@ -86,19 +95,77 @@ void PinDisplayWidget::paintEvent(QPaintEvent* event) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
+    // Draw background
+    painter.fillRect(rect(), QColor("#1a1a1a"));
+    
+    // Draw pin positions guide (subtle)
+    painter.setPen(QPen(QColor("#333333"), 1, Qt::DashLine));
+    painter.setBrush(Qt::NoBrush);
+    
+    // Draw connecting lines to show pin arrangement
+    QRect widgetRect = rect().adjusted(10, 10, -10, -10);
+    
+    // Get pin centers
+    QVector<QPointF> centers;
+    for (int i = 0; i < 5; ++i) {
+        QRect pinRect = getPinRect(i);
+        centers.append(pinRect.center());
+    }
+    
+    // Draw formation lines (very subtle)
+    if (displayMode != "mini") {
+        painter.setPen(QPen(QColor("#222222"), 1));
+        // L2 to R2 (top line)
+        painter.drawLine(centers[0], centers[4]);
+        // L3 to R3 (middle line) 
+        painter.drawLine(centers[1], centers[3]);
+        // Connect to center pin
+        painter.drawLine(centers[1], centers[2]);
+        painter.drawLine(centers[3], centers[2]);
+    }
+    
+    // Draw pins
     for (int i = 0; i < 5; ++i) {
         QRect pinRect = getPinRect(i);
         bool isUp = pinStates[i] == 1;
         
         if (isAnimating) {
-            // During animation, interpolate between start and end states
-            // For simplicity, just use the final state
-            isUp = animationEndStates[i] == 1;
+            // During animation, show falling effect
+            qreal progress = animationProgress;
+            bool finalState = animationEndStates[i] == 1;
+            
+            if (animationStartStates[i] == 1 && animationEndStates[i] == 0) {
+                // Pin falling - show tilted/fading effect
+                painter.save();
+                painter.translate(pinRect.center());
+                painter.rotate(progress * 90); // Tilt as it falls
+                painter.translate(-pinRect.center());
+                drawPin(painter, i, pinRect, finalState, 1.0 - progress * 0.5);
+                painter.restore();
+            } else {
+                drawPin(painter, i, pinRect, isUp);
+            }
+        } else {
+            drawPin(painter, i, pinRect, isUp);
+        }
+    }
+    
+    // Draw value display
+    if (displayMode == "large") {
+        int totalValue = 0;
+        for (int i = 0; i < 5; ++i) {
+            if (pinStates[i] == 0) { // Pin down
+                totalValue += pinValues[i];
+            }
         }
         
-        drawPin(painter, i, pinRect, isUp);
+        painter.setPen(QColor("#FFD700"));
+        painter.setFont(QFont("Arial", 14, QFont::Bold));
+        QString valueText = QString("Value: %1").arg(totalValue);
+        painter.drawText(rect().adjusted(5, 5, -5, -5), Qt::AlignBottom | Qt::AlignRight, valueText);
     }
 }
+
 
 void PinDisplayWidget::resizeEvent(QResizeEvent* event) {
     Q_UNUSED(event)
@@ -119,29 +186,70 @@ void PinDisplayWidget::updatePinDisplay() {
     update(); // Trigger a repaint
 }
 
-void PinDisplayWidget::drawPin(QPainter& painter, int pinIndex, const QRect& rect, bool isUp) {
-    // Set pin color
-    QColor color = isUp ? QColor(upColor) : QColor(downColor);
-    painter.setBrush(QBrush(color));
-    painter.setPen(QPen(Qt::black, 2));
+void PinDisplayWidget::drawPin(QPainter& painter, int pinIndex, const QRect& rect, bool isUp, qreal opacity) {
+    painter.setOpacity(opacity);
     
-    // Draw pin as an ellipse
-    painter.drawEllipse(rect);
+    // Set pin colors with better contrast for dark theme
+    QColor pinColor;
+    if (isUp) {
+        pinColor = QColor(upColor);
+        if (pinColor == QColor("#87CEEB")) { // Default light blue
+            pinColor = QColor("#4169E1"); // Royal blue
+        }
+    } else {
+        pinColor = QColor(downColor);
+        if (pinColor == QColor("#2F4F4F")) { // Default dark slate gray
+            pinColor = QColor("#696969"); // Dim gray
+        }
+    }
+    
+    // Draw pin shadow first (for 3D effect)
+    if (isUp) {
+        QRect shadowRect = rect.adjusted(2, 2, 2, 2);
+        painter.setBrush(QColor(0, 0, 0, 50));
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(shadowRect);
+    }
+    
+    // Draw main pin body
+    painter.setBrush(QBrush(pinColor));
+    painter.setPen(QPen(Qt::white, 2));
+    
+    if (isUp) {
+        // Standing pin - draw as circle with highlight
+        painter.drawEllipse(rect);
+        
+        // Add highlight for 3D effect
+        QRect highlightRect = QRect(rect.left() + rect.width()/4, 
+                                  rect.top() + rect.height()/4,
+                                  rect.width()/3, rect.height()/3);
+        painter.setBrush(QColor(255, 255, 255, 80));
+        painter.setPen(Qt::NoPen);
+        painter.drawEllipse(highlightRect);
+    } else {
+        // Fallen pin - draw as flattened ellipse
+        painter.setBrush(QBrush(pinColor));
+        painter.setPen(QPen(Qt::darkGray, 1));
+        
+        QRect flatRect = QRect(rect.left() - 5, rect.center().y() - 3, 
+                              rect.width() + 10, 6);
+        painter.drawEllipse(flatRect);
+    }
     
     // Draw pin label
-    painter.setPen(Qt::black);
-    QFont font = painter.font();
-    font.setPointSize(displayMode == "mini" ? 8 : (displayMode == "small" ? 10 : 12));
-    font.setBold(true);
+    painter.setOpacity(1.0);
+    painter.setPen(Qt::white);
+    QFont font = QFont("Arial", displayMode == "mini" ? 8 : (displayMode == "small" ? 10 : 12), QFont::Bold);
     painter.setFont(font);
     
     painter.drawText(rect, Qt::AlignCenter, pinNames[pinIndex]);
     
-    // Draw pin value
+    // Draw pin value below (except for mini mode)
     if (displayMode != "mini") {
-        QRect valueRect = rect.adjusted(0, rect.height() * 0.7, 0, 0);
+        QRect valueRect = rect.adjusted(0, rect.height() * 0.7, 0, rect.height() * 0.3);
         font.setPointSize(font.pointSize() - 2);
         painter.setFont(font);
+        painter.setPen(QColor("#FFD700")); // Gold color for values
         painter.drawText(valueRect, Qt::AlignCenter, QString::number(pinValues[pinIndex]));
     }
 }
@@ -154,7 +262,7 @@ QRect PinDisplayWidget::getPinRect(int pinIndex) const {
     QPointF pos = pinPositions[pinIndex];
     QSize widgetSize = size();
     
-    int pinSize = displayMode == "mini" ? 20 : (displayMode == "small" ? 25 : 35);
+    int pinSize = displayMode == "mini" ? 25 : (displayMode == "small" ? 35 : 45);
     
     int x = static_cast<int>(pos.x() * widgetSize.width() - pinSize / 2);
     int y = static_cast<int>(pos.y() * widgetSize.height() - pinSize / 2);
@@ -166,7 +274,22 @@ QRect PinDisplayWidget::getPinRect(int pinIndex) const {
 GameStatusWidget::GameStatusWidget(QWidget* parent) : QFrame(parent) {
     setupUI();
     setFrameStyle(QFrame::Box);
-    QFrame::setStyleSheet("QFrame { background-color: darkblue; color: white; }");
+    
+    // Dark theme styling
+    setStyleSheet(R"(
+        GameStatusWidget {
+            background-color: #2b2b2b;
+            color: #ffffff;
+            border: 2px solid #555555;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        QLabel {
+            background-color: transparent;
+            color: #ffffff;
+            font-weight: bold;
+        }
+    )");
 }
 
 void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ball, const QVector<int>& pinStates) {
@@ -174,6 +297,28 @@ void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ba
     frameLabel->setText(QString("Frame: %1").arg(frame + 1));
     ballLabel->setText(QString("Ball: %1").arg(ball + 1));
     pinDisplay->setPinStates(pinStates);
+    
+    // Update text colors based on game state
+    QString statusStyle = R"(
+        QLabel {
+            color: #00FF00;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: transparent;
+        }
+    )";
+    statusLabel->setStyleSheet(statusStyle);
+    
+    QString frameStyle = R"(
+        QLabel {
+            color: #FFD700;
+            font-size: 16px;
+            font-weight: bold;
+            background-color: transparent;
+        }
+    )";
+    frameLabel->setStyleSheet(frameStyle);
+    ballLabel->setStyleSheet(frameStyle);
 }
 
 void GameStatusWidget::updateBallNumber(int ballNumber) {
@@ -189,38 +334,77 @@ void GameStatusWidget::resetStatus() {
     frameLabel->setText("Frame: -");
     ballLabel->setText("Ball: -");
     pinDisplay->resetPins();
+    
+    // Reset to default colors
+    QString defaultStyle = R"(
+        QLabel {
+            color: #888888;
+            font-size: 16px;
+            font-weight: normal;
+            background-color: transparent;
+        }
+    )";
+    statusLabel->setStyleSheet(defaultStyle);
+    frameLabel->setStyleSheet(defaultStyle);
+    ballLabel->setStyleSheet(defaultStyle);
 }
 
 void GameStatusWidget::setStyleSheet(const QString& background, const QString& foreground) {
-    QFrame::setStyleSheet(QString("QFrame { background-color: %1; color: %2; }").arg(background, foreground));
+    QString customStyle = QString(R"(
+        GameStatusWidget {
+            background-color: %1;
+            color: %2;
+            border: 2px solid %2;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        QLabel {
+            background-color: transparent;
+            color: %2;
+            font-weight: bold;
+        }
+    )").arg(background, foreground);
+    
+    QFrame::setStyleSheet(customStyle);
 }
 
 void GameStatusWidget::setupUI() {
     mainLayout = new QHBoxLayout(this);
     
-    // Status information
+    // Status information panel
     QVBoxLayout* infoLayout = new QVBoxLayout();
     
     statusLabel = new QLabel("Waiting for game...", this);
-    statusLabel->setFont(QFont("Arial", 16, QFont::Bold));
+    statusLabel->setFont(QFont("Arial", 18, QFont::Bold));
+    statusLabel->setAlignment(Qt::AlignLeft);
     
     frameLabel = new QLabel("Frame: -", this);
-    frameLabel->setFont(QFont("Arial", 14));
+    frameLabel->setFont(QFont("Arial", 16, QFont::Bold));
+    frameLabel->setAlignment(Qt::AlignLeft);
     
     ballLabel = new QLabel("Ball: -", this);
-    ballLabel->setFont(QFont("Arial", 14));
+    ballLabel->setFont(QFont("Arial", 16, QFont::Bold));
+    ballLabel->setAlignment(Qt::AlignLeft);
     
     infoLayout->addWidget(statusLabel);
     infoLayout->addWidget(frameLabel);
     infoLayout->addWidget(ballLabel);
+    infoLayout->addStretch();
     
-    // Pin display
+    // Pin display - positioned on the right
     pinDisplay = new PinDisplayWidget(this);
     pinDisplay->setDisplayMode("small");
+    pinDisplay->setMinimumSize(140, 105);
+    pinDisplay->setMaximumSize(180, 135);
     
-    mainLayout->addLayout(infoLayout, 1);
-    mainLayout->addWidget(pinDisplay, 0);
+    // Layout with proper spacing
+    mainLayout->addLayout(infoLayout, 2);
+    mainLayout->addStretch(1);
+    mainLayout->addWidget(pinDisplay, 1);
+    mainLayout->setSpacing(15);
+    mainLayout->setContentsMargins(15, 10, 15, 10);
 }
+
 
 // BowlerWidget implementation
 BowlerWidget::BowlerWidget(const Bowler& bowler, bool isCurrentPlayer, QWidget* parent)

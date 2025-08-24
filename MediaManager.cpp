@@ -730,5 +730,4 @@ MediaType MediaManager::getMediaType(const QString& filePath) const {
     }
     
     return MediaType::Image; // Default
-
 }

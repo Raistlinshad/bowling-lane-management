@@ -961,5 +961,4 @@ bool QuickGame::validateBowlerData(const Bowler& bowler) const {
     }
     
     return true;
-
 }

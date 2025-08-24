@@ -18,6 +18,10 @@ enum class ClientConnectionState {
     Reconnecting
 };
 
+ConnectionState m_connectionState;
+int m_reconnectAttempts;
+QTimer* m_reconnectTimer;
+
 class LaneClient : public QObject
 {
     Q_OBJECT
@@ -70,6 +74,7 @@ private:
     void startServerDiscovery();
     void sendRegistration();
     QString getLocalIpAddress();
+    bool validateConnection();
     
     // Connection management
     int m_laneId;
