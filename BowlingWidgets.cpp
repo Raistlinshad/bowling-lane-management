@@ -8,11 +8,11 @@
 
 // Static constants for PinDisplayWidget - CORRECTED LAYOUT
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
-    QPointF(0.15, 0.3),   // lTwo (top-left)
-    QPointF(0.35, 0.6),  // lThree (upper-left) 
-    QPointF(0.5, 0.9),    // cFive (bottom-center)
-    QPointF(0.65, 0.6),  // rThree (upper-right)
-    QPointF(0.85, 0.3)    // rTwo (top-right)
+    QPointF(0.15, 0.15),   // lTwo (top-left)
+    QPointF(0.35, 0.45),  // lThree (upper-left) 
+    QPointF(0.5, 0.75),    // cFive (bottom-center)
+    QPointF(0.65, 0.45),  // rThree (upper-right)
+    QPointF(0.85, 0.15)    // rTwo (top-right)
 };
 
 const QStringList PinDisplayWidget::pinNames = {"L2", "L3", "C5", "R3", "R2"};
@@ -960,4 +960,5 @@ void ScrollTextWidget::calculateScrollParameters() {
     textWidth = fm.horizontalAdvance(scrollText);
 
 }
+
 
