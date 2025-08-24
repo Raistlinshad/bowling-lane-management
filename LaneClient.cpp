@@ -144,9 +144,10 @@ void LaneClient::onError(QAbstractSocket::SocketError error)
 {
     qWarning() << "Socket error:" << error << m_socket->errorString();
     
-    if (m_connectionState == ConnectionState::Connected || 
-        m_connectionState == ConnectionState::Connecting) {
-        m_connectionState = ConnectionState::Reconnecting;
+    // FIXED: Use ClientConnectionState instead of ConnectionState
+    if (m_connectionState == ClientConnectionState::Connected || 
+        m_connectionState == ClientConnectionState::Connecting) {
+        m_connectionState = ClientConnectionState::Reconnecting;
         m_registered = false;
         m_heartbeatTimer->stop();
         
@@ -423,10 +424,15 @@ bool LaneClient::validateConnection()
         return false;
     }
     
-    // Send ping and wait for response with timeout
+    // FIXED: sendMessage returns void, so we can't return its result
+    // Instead, check if we can write to the socket
     QJsonObject ping;
     ping["type"] = "ping";
     ping["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     
-    return sendMessage(ping); // Add timeout logic here
+    // Send the ping message
+    sendMessage(ping);
+    
+    // Return true if socket is still connected after sending
+    return m_socket->state() == QTcpSocket::ConnectedState;
 }
