@@ -330,7 +330,7 @@ private:
         gameInterfaceWidget->setStyleSheet(gameStyle);
         
         // Update game status widget colors
-        gameStatus->setStyleSheet(scheme.background, scheme.foreground);
+        gameStatus->setGameStyleSheet(scheme.background, scheme.foreground);
     }
     
     void sendGameStatus() {
