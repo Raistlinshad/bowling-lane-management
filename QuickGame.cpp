@@ -407,7 +407,7 @@ QuickGame::~QuickGame() {
 }
 
 void QuickGame::startGame(const QJsonObject& gameData) {
-    qDebug() << "Starting quick game with data:" << gameData;
+    qDebug() << "QuickGame::startGame called with data:" << gameData;
     
     // Parse game settings
     QJsonArray playersArray = gameData["players"].toArray();
@@ -417,6 +417,7 @@ void QuickGame::startGame(const QJsonObject& gameData) {
         QString playerName = value.toString();
         if (!playerName.isEmpty()) {
             bowlers.append(Bowler(playerName));
+            qDebug() << "Added player:" << playerName;
         }
     }
     
@@ -424,6 +425,7 @@ void QuickGame::startGame(const QJsonObject& gameData) {
         // Default players for testing
         bowlers.append(Bowler("Player 1"));
         bowlers.append(Bowler("Player 2"));
+        qDebug() << "Added default players";
     }
     
     // Game limits
@@ -437,6 +439,13 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     isHeld = false;
     gameStartTime = QDateTime::currentMSecsSinceEpoch();
     
+    qDebug() << "Game state initialized - emitting signals";
+    
+    // IMPORTANT: Emit signals in the right order
+    emit gameStarted();
+    emit currentPlayerChanged(getCurrentBowler().name, currentBowlerIndex);
+    emit gameUpdated();
+    
     // Start machine interface
     startMachineInterface();
     
@@ -445,9 +454,7 @@ void QuickGame::startGame(const QJsonObject& gameData) {
         gameTimer->start();
     }
     
-    emit gameStarted();
-    emit currentPlayerChanged(getCurrentBowler().name, currentBowlerIndex);
-    emit gameUpdated();
+    qDebug() << "QuickGame::startGame completed successfully";
 }
 
 void QuickGame::resetGame() {

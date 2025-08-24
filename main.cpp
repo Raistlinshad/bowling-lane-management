@@ -76,9 +76,21 @@ private slots:
     }
     
     void onGameStarted() {
+        qDebug() << "=== GAME STARTED SIGNAL RECEIVED ===";
+        qDebug() << "Current gameActive state:" << gameActive;
+    
         gameActive = true;
+        qDebug() << "Set gameActive to true";
+    
+        qDebug() << "About to call showGameInterface()";
         showGameInterface();
+        qDebug() << "Finished showGameInterface()";
+    
+        qDebug() << "About to call applyGameColors()";
         applyGameColors();
+        qDebug() << "Finished applyGameColors()";
+    
+        qDebug() << "=== GAME STARTED PROCESSING COMPLETE ===";
     }
     
     void onGameEnded(const QJsonObject& results) {
@@ -90,37 +102,59 @@ private slots:
     }
     
     void onGameCommand(const QString& type, const QJsonObject& data) {
-        qDebug() << "Received game command:" << type;
-        
+        qDebug() << "=== RECEIVED GAME COMMAND ===" << type;
+        qDebug() << "Full data received:" << data;
+        qDebug() << "Data keys:" << data.keys();
+    
         if (type == "quick_game") {
+            qDebug() << "Processing quick_game command";
+            qDebug() << "Players array:" << data["players"];
+        
             currentGameType = "quick_game";
+        
+            qDebug() << "About to call game->startGame()";
             game->startGame(data);
+            qDebug() << "Finished calling game->startGame()";
+        
         } else if (type == "league_game") {
+            qDebug() << "Processing league_game command";
             currentGameType = "league_game";
             game->startGame(data);
         } else if (type == "tournament_game") {
+            qDebug() << "Processing tournament_game command";
             currentGameType = "tournament_game";
             game->startGame(data);
         } else if (type == "status_update") {
+            qDebug() << "Processing status_update command";
             sendGameStatus();
         } else if (type == "player_update_add") {
             QString playerName = data["player_name"].toString();
+            qDebug() << "Adding player:" << playerName;
             if (gameActive) game->addPlayer(playerName);
         } else if (type == "player_update_remove") {
             QString playerName = data["player_name"].toString();
+            qDebug() << "Removing player:" << playerName;
             if (gameActive) game->removePlayer(playerName);
         } else if (type == "score_update") {
+            qDebug() << "Processing score_update command";
             if (gameActive) game->updateScore(data);
         } else if (type == "hold_update") {
             bool hold = data["hold"].toBool();
+            qDebug() << "Processing hold_update command, hold =" << hold;
             if (gameActive && hold != game->isGameHeld()) {
                 game->holdGame();
             }
         } else if (type == "move_to") {
+            qDebug() << "Processing move_to command";
             handleMoveToLane(data);
         } else if (type == "scroll_update") {
+            qDebug() << "Processing scroll_update command";
             updateScrollText(data["text"].toString());
+        } else {
+            qDebug() << "Unknown game command type:" << type;
         }
+    
+        qDebug() << "=== FINISHED PROCESSING GAME COMMAND ===";
     }
 
 private:
@@ -197,12 +231,24 @@ private:
     }
     
     void showGameInterface() {
+        qDebug() << "=== SHOWING GAME INTERFACE ===";
+    
+        qDebug() << "Current mediaDisplay max height:" << mediaDisplay->maximumHeight();
+        qDebug() << "Current gameInterfaceWidget visibility:" << gameInterfaceWidget->isVisible();
+    
         // Shrink media display to make room for game interface
         mediaDisplay->setMaximumHeight(400);
+        qDebug() << "Set mediaDisplay max height to 400";
+    
         gameInterfaceWidget->show();
-        
+        qDebug() << "Called gameInterfaceWidget->show(), now visible:" << gameInterfaceWidget->isVisible();
+    
         // Show the game display in media area
+        qDebug() << "About to call mediaDisplay->showGameDisplay()";
         mediaDisplay->showGameDisplay(gameDisplayArea);
+        qDebug() << "Finished mediaDisplay->showGameDisplay()";
+    
+        qDebug() << "=== GAME INTERFACE DISPLAY COMPLETE ===";
     }
     
     void hideGameInterface() {
@@ -227,19 +273,39 @@ private:
     }
     
     void setupGame() {
+        qDebug() << "=== SETTING UP GAME ===";
+    
         game = new QuickGame(this);
-        
-        connect(game, &QuickGame::gameUpdated, this, &BowlingMainWindow::onGameUpdated);
-        connect(game, &QuickGame::specialEffect, this, &BowlingMainWindow::onSpecialEffect);
-        connect(game, &QuickGame::currentPlayerChanged, this, &BowlingMainWindow::onCurrentPlayerChanged);
-        connect(game, &QuickGame::gameStarted, this, &BowlingMainWindow::onGameStarted);
-        connect(game, &QuickGame::gameEnded, this, &BowlingMainWindow::onGameEnded);
-        connect(game, &QuickGame::gameHeld, this, [this](bool held) {
+        qDebug() << "Created QuickGame instance";
+    
+        // Connect with debug verification
+        bool connected = false;
+    
+        connected = connect(game, &QuickGame::gameUpdated, this, &BowlingMainWindow::onGameUpdated);
+        qDebug() << "Connected gameUpdated signal:" << connected;
+    
+        connected = connect(game, &QuickGame::specialEffect, this, &BowlingMainWindow::onSpecialEffect);
+        qDebug() << "Connected specialEffect signal:" << connected;
+    
+        connected = connect(game, &QuickGame::currentPlayerChanged, this, &BowlingMainWindow::onCurrentPlayerChanged);
+        qDebug() << "Connected currentPlayerChanged signal:" << connected;
+    
+        connected = connect(game, &QuickGame::gameStarted, this, &BowlingMainWindow::onGameStarted);
+        qDebug() << "Connected gameStarted signal:" << connected << "*** THIS IS CRITICAL ***";
+    
+        connected = connect(game, &QuickGame::gameEnded, this, &BowlingMainWindow::onGameEnded);
+        qDebug() << "Connected gameEnded signal:" << connected;
+    
+        connected = connect(game, &QuickGame::gameHeld, this, [this](bool held) {
+            qDebug() << "Game hold state changed to:" << held;
             holdButton->setText(held ? "RESUME" : "HOLD");
             holdButton->setStyleSheet(held ? 
                 "QPushButton { background-color: red; color: white; font-size: 18px; font-weight: bold; }" :
                 "QPushButton { background-color: green; color: white; font-size: 18px; font-weight: bold; }");
         });
+        qDebug() << "Connected gameHeld signal:" << connected;
+    
+        qDebug() << "=== GAME SETUP COMPLETE ===";
     }
     
     void applyDarkTheme() {
@@ -298,7 +364,7 @@ private:
             scheme.foreground = settings.value(fgKey, "white").toString();
             gameColors.append(scheme);
         }
-        
+        qDebug() << "=== CONSTRUCTOR COMPLETE - Adding manual test timer ===";
         settings.endGroup();
     }
     

@@ -110,14 +110,22 @@ void LaneClient::connectToServer()
 
 void LaneClient::onConnected()
 {
-    qDebug() << "Connected to server";
+    qDebug() << "=== LaneClient::onConnected() ===";
+    qDebug() << "Successfully connected to server at" << m_serverHost << ":" << m_serverPort;
+    
     setConnectionState(ClientConnectionState::Connected);
     m_reconnectAttempts = 0;
     
+    qDebug() << "About to send registration";
     // Send registration immediately
     sendRegistration();
+    qDebug() << "Registration sent";
     
+    qDebug() << "About to emit connected signal";
     emit connected();
+    qDebug() << "Emitted connected signal";
+    
+    qDebug() << "=== LaneClient::onConnected() - Complete ===";
 }
 
 void LaneClient::onDisconnected()
@@ -160,45 +168,67 @@ void LaneClient::onError(QAbstractSocket::SocketError error)
 
 void LaneClient::onReadyRead()
 {
+    qDebug() << "=== LaneClient::onReadyRead() - Data available ===";
+    
     while (m_socket->canReadLine()) {
         QByteArray data = m_socket->readLine();
+        qDebug() << "Raw data received:" << data;
         
         QJsonParseError error;
         QJsonDocument doc = QJsonDocument::fromJson(data, &error);
         
         if (error.error != QJsonParseError::NoError) {
             qWarning() << "JSON parse error:" << error.errorString();
+            qWarning() << "Failed to parse data:" << data;
             continue;
         }
         
         if (doc.isObject()) {
-            processMessage(doc.object());
+            QJsonObject message = doc.object();
+            qDebug() << "Parsed JSON message:" << message;
+            processMessage(message);
+        } else {
+            qWarning() << "Received JSON is not an object:" << doc;
         }
     }
+    
+    qDebug() << "=== LaneClient::onReadyRead() - Finished processing ===";
 }
 
 void LaneClient::processMessage(const QJsonObject &message)
 {
     QString type = message["type"].toString();
+    qDebug() << "=== LaneClient::processMessage() ===" << type;
+    qDebug() << "Full message:" << message;
     
     if (type == "registration_response") {
+        qDebug() << "Processing registration_response";
         handleRegistrationResponse(message);
     } else if (type == "heartbeat_response") {
+        qDebug() << "Processing heartbeat_response";
         handleHeartbeatResponse(message);
     } else if (type == "quick_game" || type == "league_game" || type == "pre_bowl") {
+        qDebug() << "Processing game command:" << type;
+        qDebug() << "About to call handleGameCommand()";
         handleGameCommand(message);
+        qDebug() << "Finished handleGameCommand()";
     } else if (type == "team_move") {
+        qDebug() << "Processing team_move";
         handleTeamMove(message);
     } else if (type == "ping") {
+        qDebug() << "Processing ping - sending pong response";
         // Respond to server ping
         QJsonObject response;
         response["type"] = "pong";
         response["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
         sendMessage(response);
     } else {
+        qDebug() << "Forwarding unknown message type:" << type;
         // Forward other messages
         emit serverMessageReceived(message);
     }
+    
+    qDebug() << "=== LaneClient::processMessage() - Complete ===";
 }
 
 void LaneClient::handleRegistrationResponse(const QJsonObject &message)
@@ -222,8 +252,16 @@ void LaneClient::handleGameCommand(const QJsonObject &message)
     QString type = message["type"].toString();
     QJsonObject data = message["data"].toObject();
     
-    qDebug() << "Received game command:" << type;
+    qDebug() << "=== LaneClient::handleGameCommand() ===";
+    qDebug() << "Command type:" << type;
+    qDebug() << "Command data:" << data;
+    qDebug() << "Data keys:" << data.keys();
+    
+    qDebug() << "About to emit gameCommandReceived signal";
     emit gameCommandReceived(type, data);
+    qDebug() << "Emitted gameCommandReceived signal";
+    
+    qDebug() << "=== LaneClient::handleGameCommand() - Complete ===";
 }
 
 void LaneClient::handleHeartbeatResponse(const QJsonObject &message)
@@ -240,14 +278,22 @@ void LaneClient::handleTeamMove(const QJsonObject &message)
 
 void LaneClient::sendRegistration()
 {
+    qDebug() << "=== LaneClient::sendRegistration() ===";
+    
     QJsonObject registration;
     registration["type"] = "registration";
-    registration["lane_id"] = m_laneId; // QString::number(m_laneId)
+    registration["lane_id"] = QString::number(m_laneId);
     registration["client_ip"] = getLocalIpAddress();
     registration["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     
+    qDebug() << "Registration data:" << registration;
+    qDebug() << "Lane ID:" << m_laneId;
+    qDebug() << "Client IP:" << getLocalIpAddress();
+    
     sendMessage(registration);
     qDebug() << "Sent registration for lane" << m_laneId;
+    
+    qDebug() << "=== LaneClient::sendRegistration() - Complete ===";
 }
 
 void LaneClient::setupHeartbeat()
@@ -435,5 +481,4 @@ bool LaneClient::validateConnection()
     
     // Return true if socket is still connected after sending
     return m_socket->state() == QTcpSocket::ConnectedState;
-
 }
