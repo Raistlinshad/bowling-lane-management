@@ -407,25 +407,34 @@ QuickGame::~QuickGame() {
 }
 
 void QuickGame::startGame(const QJsonObject& gameData) {
-    qDebug() << "QuickGame::startGame called with data:" << gameData;
+    qDebug() << "=== QuickGame::startGame() CALLED ===";
+    qDebug() << "Input gameData:" << gameData;
+    qDebug() << "gameData keys:" << gameData.keys();
     
     // Parse game settings
     QJsonArray playersArray = gameData["players"].toArray();
+    qDebug() << "Players array from data:" << playersArray;
+    qDebug() << "Players array size:" << playersArray.size();
+    
     bowlers.clear();
     
     for (const QJsonValue& value : playersArray) {
         QString playerName = value.toString();
+        qDebug() << "Processing player value:" << value << "as string:" << playerName;
         if (!playerName.isEmpty()) {
             bowlers.append(Bowler(playerName));
             qDebug() << "Added player:" << playerName;
         }
     }
     
+    qDebug() << "Total bowlers after processing:" << bowlers.size();
+    
     if (bowlers.isEmpty()) {
+        qDebug() << "No players found, adding default players";
         // Default players for testing
         bowlers.append(Bowler("Player 1"));
         bowlers.append(Bowler("Player 2"));
-        qDebug() << "Added default players";
+        qDebug() << "Added default players, total bowlers:" << bowlers.size();
     }
     
     // Game limits
@@ -433,28 +442,45 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     gameLimit = gameData["game_limit"].toInt(0);
     gamesPlayed = 0;
     
+    qDebug() << "Game limits - time:" << timeLimit << "games:" << gameLimit;
+    
     // Initialize game state
     currentBowlerIndex = 0;
     gameActive = true;
     isHeld = false;
     gameStartTime = QDateTime::currentMSecsSinceEpoch();
     
-    qDebug() << "Game state initialized - emitting signals";
+    qDebug() << "Game state initialized:";
+    qDebug() << "  currentBowlerIndex:" << currentBowlerIndex;
+    qDebug() << "  gameActive:" << gameActive;
+    qDebug() << "  isHeld:" << isHeld;
     
-    // IMPORTANT: Emit signals in the right order
+    qDebug() << "About to emit gameStarted() signal";
     emit gameStarted();
+    qDebug() << "Emitted gameStarted() signal";
+    
+    qDebug() << "About to emit currentPlayerChanged() signal";
     emit currentPlayerChanged(getCurrentBowler().name, currentBowlerIndex);
+    qDebug() << "Emitted currentPlayerChanged() signal for:" << getCurrentBowler().name;
+    
+    qDebug() << "About to emit gameUpdated() signal";
     emit gameUpdated();
+    qDebug() << "Emitted gameUpdated() signal";
     
     // Start machine interface
+    qDebug() << "About to start machine interface";
     startMachineInterface();
+    qDebug() << "Machine interface started";
     
     // Start game timer if time limit is set
     if (timeLimit > 0) {
+        qDebug() << "Starting game timer for" << timeLimit << "seconds";
         gameTimer->start();
+    } else {
+        qDebug() << "No time limit set, not starting game timer";
     }
     
-    qDebug() << "QuickGame::startGame completed successfully";
+    qDebug() << "=== QuickGame::startGame() COMPLETE ===";
 }
 
 void QuickGame::resetGame() {

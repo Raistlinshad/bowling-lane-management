@@ -42,6 +42,37 @@ public:
         setupGame();
         applyDarkTheme();
         loadGameColors();
+    
+        qDebug() << "=== CONSTRUCTOR COMPLETE - Adding manual test timer ===";
+    
+        // Test the game interface after 3 seconds
+        QTimer::singleShot(3000, this, [this]() {
+            qDebug() << "MANUAL TEST: 3 seconds elapsed, triggering fake game start";
+            qDebug() << "Current gameActive state:" << gameActive;
+            qDebug() << "Current game object valid:" << (game != nullptr);
+        
+            // Test with fake game data
+            QJsonObject testGameData;
+            QJsonArray testPlayers;
+            testPlayers.append("Test Player 1");
+            testPlayers.append("Test Player 2");
+            testGameData["players"] = testPlayers;
+            testGameData["time_limit"] = 0;
+            testGameData["game_limit"] = 0;
+        
+            qDebug() << "MANUAL TEST: About to call onGameCommand with test data";
+            onGameCommand("quick_game", testGameData);
+            qDebug() << "MANUAL TEST: Finished calling onGameCommand";
+        });
+    
+        // Also add a second test to just try the UI directly
+        QTimer::singleShot(6000, this, [this]() {
+            qDebug() << "MANUAL TEST 2: Direct UI test - calling onGameStarted()";
+            onGameStarted();
+            qDebug() << "MANUAL TEST 2: Finished direct UI test";
+        });
+    
+        qDebug() << "Manual test timers set up";
     }
 
 private slots:
