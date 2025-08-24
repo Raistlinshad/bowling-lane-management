@@ -242,7 +242,7 @@ void LaneClient::sendRegistration()
 {
     QJsonObject registration;
     registration["type"] = "registration";
-    registration["lane_id"] = QString::number(m_laneId);
+    registration["lane_id"] = m_laneId; // QString::number(m_laneId)
     registration["client_ip"] = getLocalIpAddress();
     registration["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     
@@ -435,4 +435,5 @@ bool LaneClient::validateConnection()
     
     // Return true if socket is still connected after sending
     return m_socket->state() == QTcpSocket::ConnectedState;
+
 }
