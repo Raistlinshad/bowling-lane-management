@@ -409,48 +409,48 @@ QuickGame::~QuickGame() {
 void QuickGame::startGame(const QJsonObject& gameData) {
     qDebug() << "=== QuickGame::startGame() CALLED ===";
     qDebug() << "Input gameData:" << gameData;
+    qDebug() << "gameData keys:" << gameData.keys();
     
-    // Parse game settings
-    QJsonArray playersArray = gameData["bowlers"].toArray();
-    qDebug() << "Players array from data:" << playersArray;
-    
+    // Clear existing game state
     bowlers.clear();
+    currentBowlerIndex = 0;
+    gameActive = false;
     
-    for (const QJsonValue& value : playersArray) {
-        if (value.isObject()) {
-            QJsonObject bowlerObj = value.toObject();
-            QString playerName = bowlerObj["name"].toString();
-            qDebug() << "Processing bowler object:" << bowlerObj << "name:" << playerName;
-            if (!playerName.isEmpty()) {
-                bowlers.append(Bowler(playerName));
-                qDebug() << "Added player:" << playerName;
-            }
-        } else if (value.isString()) {
-            // Fallback for string values
-            QString playerName = value.toString();
-            if (!playerName.isEmpty()) {
-                bowlers.append(Bowler(playerName));
-                qDebug() << "Added player:" << playerName;
-            }
+    // Parse bowlers from server format
+    QJsonArray bowlersArray = gameData["bowlers"].toArray();
+    qDebug() << "Bowlers array from server:" << bowlersArray;
+    qDebug() << "Bowlers array size:" << bowlersArray.size();
+    
+    for (const QJsonValue& bowlerValue : bowlersArray) {
+        QJsonObject bowlerObj = bowlerValue.toObject();
+        QString playerName = bowlerObj["name"].toString();
+        
+        qDebug() << "Processing bowler object:" << bowlerObj << "name:" << playerName;
+        
+        if (!playerName.isEmpty()) {
+            bowlers.append(Bowler(playerName));
+            qDebug() << "Added player:" << playerName;
         }
     }
     
     qDebug() << "Total bowlers after processing:" << bowlers.size();
     
     if (bowlers.isEmpty()) {
-        qDebug() << "No players found, adding default players";
-        // Default players for testing
-        bowlers.append(Bowler("Player 1"));
-        bowlers.append(Bowler("Player 2"));
-        qDebug() << "Added default players, total bowlers:" << bowlers.size();
+        qDebug() << "ERROR: No valid players found in game data";
+        emit errorOccurred("No players found in game data");
+        return;
     }
     
-    // Game limits
-    timeLimit = gameData["time"].toInt(0);
-    gameLimit = gameData["games"].toInt(0);
+    // Parse game settings
+    timeLimit = 0;
+    if (gameData.contains("time") && !gameData["time"].isNull()) {
+        timeLimit = gameData["time"].toInt(0);
+    }
+    
+    gameLimit = gameData["games"].toInt(1);
     gamesPlayed = 0;
     
-    qDebug() << "Game limits - time:" << timeLimit << "games:" << gameLimit;
+    qDebug() << "Game settings - time limit:" << timeLimit << "game limit:" << gameLimit;
     
     // Initialize game state
     currentBowlerIndex = 0;
@@ -458,11 +458,9 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     isHeld = false;
     gameStartTime = QDateTime::currentMSecsSinceEpoch();
     
-    qDebug() << "Game state initialized:";
-    qDebug() << "  currentBowlerIndex:" << currentBowlerIndex;
-    qDebug() << "  gameActive:" << gameActive;
-    qDebug() << "  isHeld:" << isHeld;
+    qDebug() << "Game state initialized successfully";
     
+    // Emit signals
     qDebug() << "About to emit gameStarted() signal";
     emit gameStarted();
     qDebug() << "Emitted gameStarted() signal";
@@ -475,17 +473,13 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     emit gameUpdated();
     qDebug() << "Emitted gameUpdated() signal";
     
-    // Start machine interface
-    qDebug() << "About to start machine interface";
-    startMachineInterface();
-    qDebug() << "Machine interface started";
+    // Machine interface disabled for now
+    qDebug() << "Machine interface disabled";
     
-    // Start game timer if time limit is set
+    // Start game timer if needed
     if (timeLimit > 0) {
-        qDebug() << "Starting game timer for" << timeLimit << "seconds";
+        qDebug() << "Starting game timer for" << timeLimit << "minutes";
         gameTimer->start();
-    } else {
-        qDebug() << "No time limit set, not starting game timer";
     }
     
     qDebug() << "=== QuickGame::startGame() COMPLETE ===";
@@ -513,15 +507,23 @@ void QuickGame::resetGame() {
 }
 
 void QuickGame::endGame() {
-    qDebug() << "Ending game";
+    qDebug() << "=== QuickGame::endGame() CALLED ===";
+    
+    if (!gameActive) {
+        qDebug() << "Game already ended, ignoring endGame call";
+        return;
+    }
     
     gameActive = false;
+    isHeld = false;
     gameTimer->stop();
+    
+    // Stop machine interface if running
     stopMachineInterface();
     
-    // Prepare final results
+    // Create final results
     QJsonObject results;
-    results["game_type"] = "quick_game";
+    results["game_type"] = "ended_by_replacement";
     results["completion_time"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     results["total_time"] = (QDateTime::currentMSecsSinceEpoch() - gameStartTime) / 1000;
     
@@ -530,12 +532,15 @@ void QuickGame::endGame() {
         QJsonObject bowlerResult;
         bowlerResult["name"] = bowler.name;
         bowlerResult["final_score"] = bowler.totalScore;
-        bowlerResult["frames_completed"] = bowler.currentFrame + (bowler.getCurrentFrame().isComplete ? 1 : 0);
+        bowlerResult["frames_completed"] = bowler.currentFrame;
         finalScores.append(bowlerResult);
     }
     results["final_scores"] = finalScores;
     
+    qDebug() << "Game ended with results:" << results;
     emit gameEnded(results);
+    
+    qDebug() << "=== QuickGame::endGame() COMPLETE ===";
 }
 
 void QuickGame::addPlayer(const QString& playerName) {

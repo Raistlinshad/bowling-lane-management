@@ -43,37 +43,8 @@ public:
         applyDarkTheme();
         loadGameColors();
     
-        qDebug() << "=== CONSTRUCTOR COMPLETE - Adding manual test timer ===";
+        qDebug() << "=== CONSTRUCTOR COMPLETE ===";
     
-        // Test the game interface after 3 seconds
-        QTimer::singleShot(3000, this, [this]() {
-            qDebug() << "MANUAL TEST: 3 seconds elapsed, triggering fake game start";
-            qDebug() << "Current gameActive state:" << gameActive;
-            qDebug() << "Current game object valid:" << (game != nullptr);
-        
-            // Test with fake game data
-            QJsonObject testGameData;
-            QJsonArray testPlayers;
-            testPlayers.append("Test Player 1");
-            testPlayers.append("Test Player 2");
-            testGameData["players"] = testPlayers;
-            testGameData["time_limit"] = 0;
-            testGameData["game_limit"] = 0;
-        
-            qDebug() << "MANUAL TEST: About to call onGameCommand with test data";
-            onGameCommand("quick_game", testGameData);
-            qDebug() << "MANUAL TEST: Finished calling onGameCommand";
-        });
-    
-        // Also add a second test to just try the UI directly
-        QTimer::singleShot(6000, this, [this]() {
-            qDebug() << "MANUAL TEST 2: Direct UI test - calling onGameStarted()";
-            onGameStarted();
-            qDebug() << "MANUAL TEST 2: Finished direct UI test";
-        });
-    
-        qDebug() << "Manual test timers set up";
-    }
 
 private slots:
     void onGameUpdated() {
@@ -134,52 +105,58 @@ private slots:
     
     void onGameCommand(const QString& type, const QJsonObject& data) {
         qDebug() << "=== RECEIVED GAME COMMAND ===" << type;
-        qDebug() << "Full data received:" << data;
-        qDebug() << "Data keys:" << data.keys();
+        qDebug() << "Current gameActive state:" << gameActive;
     
         if (type == "quick_game") {
-            qDebug() << "Processing quick_game command";
-            qDebug() << "Players array:" << data["players"];
+            // End current game if one is active
+            if (gameActive) {
+                qDebug() << "Ending current game to start new one";
+                game->endGame();
+                // Note: endGame() will call onGameEnded() which sets gameActive = false
+            }
         
+            qDebug() << "Starting new quick game";
             currentGameType = "quick_game";
-        
-            qDebug() << "About to call game->startGame()";
             game->startGame(data);
-            qDebug() << "Finished calling game->startGame()";
         
         } else if (type == "league_game") {
-            qDebug() << "Processing league_game command";
+            if (gameActive) {
+                qDebug() << "Ending current game to start new league game";
+                game->endGame();
+            }
+        
+            qDebug() << "Starting new league game";
             currentGameType = "league_game";
             game->startGame(data);
+        
         } else if (type == "tournament_game") {
-            qDebug() << "Processing tournament_game command";
+            if (gameActive) {
+                qDebug() << "Ending current game to start new tournament game";
+                game->endGame();
+            }
+        
+            qDebug() << "Starting new tournament game";
             currentGameType = "tournament_game";
             game->startGame(data);
+        
         } else if (type == "status_update") {
-            qDebug() << "Processing status_update command";
             sendGameStatus();
         } else if (type == "player_update_add") {
             QString playerName = data["player_name"].toString();
-            qDebug() << "Adding player:" << playerName;
             if (gameActive) game->addPlayer(playerName);
         } else if (type == "player_update_remove") {
             QString playerName = data["player_name"].toString();
-            qDebug() << "Removing player:" << playerName;
             if (gameActive) game->removePlayer(playerName);
         } else if (type == "score_update") {
-            qDebug() << "Processing score_update command";
             if (gameActive) game->updateScore(data);
         } else if (type == "hold_update") {
             bool hold = data["hold"].toBool();
-            qDebug() << "Processing hold_update command, hold =" << hold;
             if (gameActive && hold != game->isGameHeld()) {
                 game->holdGame();
             }
         } else if (type == "move_to") {
-            qDebug() << "Processing move_to command";
             handleMoveToLane(data);
         } else if (type == "scroll_update") {
-            qDebug() << "Processing scroll_update command";
             updateScrollText(data["text"].toString());
         } else {
             qDebug() << "Unknown game command type:" << type;
@@ -187,7 +164,6 @@ private slots:
     
         qDebug() << "=== FINISHED PROCESSING GAME COMMAND ===";
     }
-
 private:
     void setupUI() {
         setWindowTitle("Canadian 5-Pin Bowling");

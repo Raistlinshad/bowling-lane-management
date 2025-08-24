@@ -482,20 +482,62 @@ void MediaManager::createDisplayWidgets() {
     setCurrentIndex(gameDisplayIndex);
 }
 
+// Replace the showGameDisplay method in MediaManager.cpp with this safer version:
+
 void MediaManager::showGameDisplay(QWidget* gameWidget) {
-    if (gameWidget && gameDisplayIndex >= 0) {
-        // Replace the placeholder game widget
-        QWidget* oldWidget = widget(gameDisplayIndex);
-        removeWidget(oldWidget);
-        
-        gameDisplayIndex = insertWidget(gameDisplayIndex, gameWidget);
-        setCurrentIndex(gameDisplayIndex);
-        
-        oldWidget->deleteLater();
+    qDebug() << "MediaManager::showGameDisplay called";
+    qDebug() << "gameWidget pointer:" << gameWidget;
+    
+    if (!gameWidget) {
+        qDebug() << "ERROR: gameWidget is null, cannot show game display";
+        return;
     }
     
+    // Stop media rotation first
     rotationManager->stopRotation();
+    
+    // Safety check: ensure we have valid indices
+    if (gameDisplayIndex < 0 || gameDisplayIndex >= count()) {
+        qDebug() << "Invalid gameDisplayIndex, resetting to 0";
+        gameDisplayIndex = 0;
+    }
+    
+    // Get current widget safely
+    QWidget* currentWidget = nullptr;
+    if (gameDisplayIndex < count()) {
+        currentWidget = widget(gameDisplayIndex);
+    }
+    
+    // If the widget is already the same, just show it
+    if (currentWidget == gameWidget) {
+        qDebug() << "Widget is already in place, just setting current";
+        setCurrentIndex(gameDisplayIndex);
+        emit mediaDisplayStopped();
+        return;
+    }
+    
+    // Remove current widget if it exists and is different
+    if (currentWidget && currentWidget != gameWidget) {
+        qDebug() << "Removing existing widget";
+        removeWidget(currentWidget);
+        // Don't delete it - it belongs to someone else
+    }
+    
+    // Insert the new game widget
+    if (gameDisplayIndex >= count()) {
+        qDebug() << "Appending game widget";
+        gameDisplayIndex = addWidget(gameWidget);
+    } else {
+        qDebug() << "Inserting game widget at index:" << gameDisplayIndex;
+        insertWidget(gameDisplayIndex, gameWidget);
+    }
+    
+    // Show the game display
+    qDebug() << "Setting current index to:" << gameDisplayIndex;
+    setCurrentIndex(gameDisplayIndex);
+    
     emit mediaDisplayStopped();
+    qDebug() << "MediaManager::showGameDisplay completed successfully";
 }
 
 void MediaManager::showMediaRotation() {
