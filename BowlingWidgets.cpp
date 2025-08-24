@@ -10,7 +10,7 @@
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
     QPointF(0.15, 0.3),   // lTwo (top-left)
     QPointF(0.35, 0.15),  // lThree (upper-left) 
-    QPointF(0.5, 0.6),    // cFive (bottom-center)
+    QPointF(0.5, 0.27),    // cFive (bottom-center)
     QPointF(0.65, 0.15),  // rThree (upper-right)
     QPointF(0.85, 0.3)    // rTwo (top-right)
 };
@@ -960,3 +960,4 @@ void ScrollTextWidget::calculateScrollParameters() {
     textWidth = fm.horizontalAdvance(scrollText);
 
 }
+
