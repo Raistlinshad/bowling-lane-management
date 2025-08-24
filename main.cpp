@@ -44,6 +44,7 @@ public:
         loadGameColors();
     
         qDebug() << "=== CONSTRUCTOR COMPLETE ===";
+    }
     
 
 private slots:

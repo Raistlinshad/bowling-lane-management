@@ -958,6 +958,4 @@ void ScrollTextWidget::onScrollTimer() {
 void ScrollTextWidget::calculateScrollParameters() {
     QFontMetrics fm(scrollFont);
     textWidth = fm.horizontalAdvance(scrollText);
-
 }
-
