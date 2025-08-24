@@ -409,21 +409,29 @@ QuickGame::~QuickGame() {
 void QuickGame::startGame(const QJsonObject& gameData) {
     qDebug() << "=== QuickGame::startGame() CALLED ===";
     qDebug() << "Input gameData:" << gameData;
-    qDebug() << "gameData keys:" << gameData.keys();
     
     // Parse game settings
-    QJsonArray playersArray = gameData["players"].toArray();
+    QJsonArray playersArray = gameData["bowlers"].toArray();
     qDebug() << "Players array from data:" << playersArray;
-    qDebug() << "Players array size:" << playersArray.size();
     
     bowlers.clear();
     
     for (const QJsonValue& value : playersArray) {
-        QString playerName = value.toString();
-        qDebug() << "Processing player value:" << value << "as string:" << playerName;
-        if (!playerName.isEmpty()) {
-            bowlers.append(Bowler(playerName));
-            qDebug() << "Added player:" << playerName;
+        if (value.isObject()) {
+            QJsonObject bowlerObj = value.toObject();
+            QString playerName = bowlerObj["name"].toString();
+            qDebug() << "Processing bowler object:" << bowlerObj << "name:" << playerName;
+            if (!playerName.isEmpty()) {
+                bowlers.append(Bowler(playerName));
+                qDebug() << "Added player:" << playerName;
+            }
+        } else if (value.isString()) {
+            // Fallback for string values
+            QString playerName = value.toString();
+            if (!playerName.isEmpty()) {
+                bowlers.append(Bowler(playerName));
+                qDebug() << "Added player:" << playerName;
+            }
         }
     }
     
@@ -438,8 +446,8 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     }
     
     // Game limits
-    timeLimit = gameData["time_limit"].toInt(0);
-    gameLimit = gameData["game_limit"].toInt(0);
+    timeLimit = gameData["time"].toInt(0);
+    gameLimit = gameData["games"].toInt(0);
     gamesPlayed = 0;
     
     qDebug() << "Game limits - time:" << timeLimit << "games:" << gameLimit;
