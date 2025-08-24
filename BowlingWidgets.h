@@ -29,6 +29,7 @@ class Frame;
 // Canadian 5-pin display widget
 class PinDisplayWidget : public QWidget {
     Q_OBJECT
+    Q_PROPERTY(qreal animationProgress READ animationProgress WRITE setAnimationProgress)
     
 public:
     explicit PinDisplayWidget(QWidget* parent = nullptr);
@@ -39,6 +40,10 @@ public:
     
     void setDisplayMode(const QString& mode); // "large", "small", "mini"
     void setColorScheme(const QString& upColor, const QString& downColor);
+    
+    // Animation property
+    qreal animationProgress() const { return m_animationProgress; }
+    void setAnimationProgress(qreal progress) { m_animationProgress = progress; update(); }
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -50,7 +55,7 @@ private slots:
 private:
     void setupPinLayout();
     void updatePinDisplay();
-    void drawPin(QPainter& painter, int pinIndex, const QRect& rect, bool isUp);
+    void drawPin(QPainter& painter, int pinIndex, const QRect& rect, bool isUp, qreal opacity = 1.0);
     QRect getPinRect(int pinIndex) const;
     
     QVector<int> pinStates;     // 0 = down, 1 = up
@@ -65,6 +70,7 @@ private:
     QVector<int> animationStartStates;
     QVector<int> animationEndStates;
     bool isAnimating;
+    qreal m_animationProgress;
     
     // Layout positions for Canadian 5-pin
     static const QVector<QPointF> pinPositions;
@@ -84,7 +90,7 @@ public:
     void updateFrameNumber(int frameNumber);
     void resetStatus();
     
-    void setStyleSheet(const QString& background, const QString& foreground);
+    void setGameStyleSheet(const QString& background, const QString& foreground);
 
 private:
     void setupUI();
@@ -280,185 +286,5 @@ private:
     QTimer* scrollTimer;
     QFont scrollFont;
 };
-
-/*
-
-// Main bowling display widget that combines all components
-class BowlingDisplayWidget : public QWidget {
-    Q_OBJECT
-    
-public:
-    explicit BowlingDisplayWidget(QWidget* parent = nullptr);
-    
-    void setGame(QuickGame* game);
-    void updateDisplay();
-    void updateCurrentPlayer(int bowlerIndex);
-    
-    // Display configuration
-    void setMaxVisibleBowlers(int maxVisible);
-    void setColorScheme(const QJsonObject& colors);
-    void setDisplayMode(const QString& mode); // "full", "compact", "minimal"
-    
-    // Animation control
-    void setAnimationsEnabled(bool enabled);
-    void animatePlayerRotation();
-    void animateScoreUpdate(int bowlerIndex, int frameIndex);
-    
-    // Special display modes
-    void showGameComplete(const QVector<Bowler>& finalStandings);
-    void showFrameComplete(const Bowler& bowler, int frameIndex);
-    
-    // Server-controlled updates
-    void handleDisplayUpdate(const QJsonObject& update);
-
-signals:
-    void bowlerSelected(int bowlerIndex);
-    void gameControlActivated(const QString& action);
-
-private slots:
-    void onGameUpdated();
-    void onCurrentPlayerChanged(int bowlerIndex);
-    void onBowlerSelected(int bowlerIndex);
-    void onGameControlClicked(const QString& action);
-    void onScrollTextChanged(const QString& text);
-
-private:
-    void setupUI();
-    void connectSignals();
-    void updateGameStatus();
-    void updateBowlerList();
-    void updateControls();
-    
-    // UI Components
-    GameStatusWidget* gameStatus;
-    BowlerListWidget* bowlerList;
-    GameControlWidget* gameControls;
-    ScrollTextWidget* scrollText;
-    
-    QVBoxLayout* mainLayout;
-    QHBoxLayout* bottomLayout;
-    
-    // Game reference
-    QuickGame* game;
-    
-    // Display settings
-    int maxVisibleBowlers;
-    QJsonObject colorScheme;
-    QString displayMode;
-    bool animationsEnabled;
-    
-    // State tracking
-    int lastCurrentBowler;
-    QVector<int> lastScores;
-};
-
-// Frame detail popup widget (for detailed frame information)
-class FrameDetailWidget : public QFrame {
-    Q_OBJECT
-    
-public:
-    explicit FrameDetailWidget(QWidget* parent = nullptr);
-    
-    void showFrameDetail(const Bowler& bowler, int frameIndex);
-    void hideDetail();
-    
-    void setAutoHideDelay(int milliseconds);
-
-signals:
-    void detailClosed();
-
-protected:
-    void mousePressEvent(QMouseEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;
-
-private slots:
-    void onAutoHideTimer();
-
-private:
-    void setupUI();
-    void updateFrameDisplay(const Frame& frame, int frameIndex, bool isTenthFrame);
-    void showAnimated();
-    void hideAnimated();
-    
-    QLabel* titleLabel;
-    QLabel* ballsLabel;
-    QLabel* scoreLabel;
-    QLabel* bonusLabel;
-    PinDisplayWidget* pinDisplay;
-    
-    QVBoxLayout* mainLayout;
-    QPropertyAnimation* showAnimation;
-    QPropertyAnimation* hideAnimation;
-    QTimer* autoHideTimer;
-    
-    int autoHideDelay;
-    bool isVisible;
-};
-
-// Score animation widget for special effects
-class ScoreAnimationWidget : public QWidget {
-    Q_OBJECT
-    
-public:
-    explicit ScoreAnimationWidget(QWidget* parent = nullptr);
-    
-    void animateStrike(const QPoint& position);
-    void animateSpare(const QPoint& position);
-    void animateScore(int score, const QPoint& position);
-    void animateBonus(int bonus, const QPoint& position);
-    
-    void setAnimationStyle(const QString& style); // "popup", "fly", "fade"
-
-signals:
-    void animationFinished(const QString& type);
-
-protected:
-    void paintEvent(QPaintEvent* event) override;
-
-private slots:
-    void onAnimationFinished();
-    void updateAnimation();
-
-private:
-    void setupAnimation(const QString& text, const QColor& color, const QPoint& position);
-    void createPopupAnimation(const QPoint& position);
-    void createFlyAnimation(const QPoint& position);
-    void createFadeAnimation(const QPoint& position);
-    
-    QString animationText;
-    QColor animationColor;
-    QPoint animationPosition;
-    QString animationStyle;
-    QString currentAnimationType;
-    
-    QPropertyAnimation* positionAnimation;
-    QPropertyAnimation* opacityAnimation;
-    QPropertyAnimation* scaleAnimation;
-    QTimer* updateTimer;
-    
-    qreal animationProgress;
-    bool isAnimating;
-};
-
-// Tournament/League display variant (future expansion)
-class TournamentDisplayWidget : public BowlingDisplayWidget {
-    Q_OBJECT
-    
-public:
-    explicit TournamentDisplayWidget(QWidget* parent = nullptr);
-    
-    void setTournamentMode(const QString& mode); // "elimination", "round_robin", "swiss"
-    void updateTournamentStandings(const QJsonArray& standings);
-    void showMatchup(const QJsonObject& matchup);
-
-private:
-    void setupTournamentUI();
-    
-    QString tournamentMode;
-    QLabel* tournamentStatus;
-    QWidget* standingsWidget;
-};
-
-*/
 
 #endif // BOWLINGWIDGETS_H

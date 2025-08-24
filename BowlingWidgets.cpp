@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QEasingCurve>
 
-// Static constants for PinDisplayWidget
+// Static constants for PinDisplayWidget - CORRECTED LAYOUT
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
     QPointF(0.15, 0.3),   // lTwo (top-left)
     QPointF(0.35, 0.15),  // lThree (upper-left) 
@@ -21,7 +21,7 @@ const QVector<int> PinDisplayWidget::pinValues = {2, 3, 5, 3, 2};
 // PinDisplayWidget implementation
 PinDisplayWidget::PinDisplayWidget(QWidget* parent) 
     : QWidget(parent), displayMode("large"), upColor("#87CEEB"), downColor("#2F4F4F"), 
-      pinAnimation(nullptr), isAnimating(false) {
+      pinAnimation(nullptr), isAnimating(false), m_animationProgress(0.0) {
     
     pinStates.resize(5);
     resetPins();
@@ -131,7 +131,7 @@ void PinDisplayWidget::paintEvent(QPaintEvent* event) {
         
         if (isAnimating) {
             // During animation, show falling effect
-            qreal progress = animationProgress;
+            qreal progress = m_animationProgress; // FIXED: Use member variable
             bool finalState = animationEndStates[i] == 1;
             
             if (animationStartStates[i] == 1 && animationEndStates[i] == 0) {
@@ -166,7 +166,6 @@ void PinDisplayWidget::paintEvent(QPaintEvent* event) {
     }
 }
 
-
 void PinDisplayWidget::resizeEvent(QResizeEvent* event) {
     Q_UNUSED(event)
     updatePinDisplay();
@@ -194,12 +193,12 @@ void PinDisplayWidget::drawPin(QPainter& painter, int pinIndex, const QRect& rec
     if (isUp) {
         pinColor = QColor(upColor);
         if (pinColor == QColor("#87CEEB")) { // Default light blue
-            pinColor = QColor("#4169E1"); // Royal blue
+            pinColor = QColor("#4169E1"); // Royal blue - better for dark theme
         }
     } else {
         pinColor = QColor(downColor);
         if (pinColor == QColor("#2F4F4F")) { // Default dark slate gray
-            pinColor = QColor("#696969"); // Dim gray
+            pinColor = QColor("#696969"); // Dim gray - better contrast
         }
     }
     
@@ -268,15 +267,15 @@ QRect PinDisplayWidget::getPinRect(int pinIndex) const {
     int y = static_cast<int>(pos.y() * widgetSize.height() - pinSize / 2);
     
     return QRect(x, y, pinSize, pinSize);
-}
+}turn QRect(x, y, pinSize, pinSize);
 
-// GameStatusWidget implementation
+// GameStatusWidget implementation - FIXED
 GameStatusWidget::GameStatusWidget(QWidget* parent) : QFrame(parent) {
     setupUI();
     setFrameStyle(QFrame::Box);
     
-    // Dark theme styling
-    setStyleSheet(R"(
+    // FIXED: Use QFrame::setStyleSheet instead of custom setStyleSheet
+    QFrame::setStyleSheet(R"(
         GameStatusWidget {
             background-color: #2b2b2b;
             color: #ffffff;
@@ -349,7 +348,7 @@ void GameStatusWidget::resetStatus() {
     ballLabel->setStyleSheet(defaultStyle);
 }
 
-void GameStatusWidget::setStyleSheet(const QString& background, const QString& foreground) {
+void GameStatusWidget::setGameStyleSheet(const QString& background, const QString& foreground) {
     QString customStyle = QString(R"(
         GameStatusWidget {
             background-color: %1;
@@ -404,7 +403,6 @@ void GameStatusWidget::setupUI() {
     mainLayout->setSpacing(15);
     mainLayout->setContentsMargins(15, 10, 15, 10);
 }
-
 
 // BowlerWidget implementation
 BowlerWidget::BowlerWidget(const Bowler& bowler, bool isCurrentPlayer, QWidget* parent)
