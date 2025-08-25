@@ -29,6 +29,9 @@
 #include "QuickGame.h"
 #include "BowlingWidgets.h"
 #include "MediaManager.h"
+#include "ThreeSixNineTracker.h"
+#include "GameStatistics.h"
+#include "GameRecoveryManager.h"
 
 // Main bowling window
 class BowlingMainWindow : public QMainWindow {
@@ -792,5 +795,6 @@ int main(int argc, char *argv[])
     
     return app.exec();
 }
+
 
 #include "main.moc"
