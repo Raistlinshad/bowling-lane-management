@@ -90,7 +90,8 @@ public:
     void updateFrameNumber(int frameNumber);
     void resetStatus();
     
-    void setGameStyleSheet(const QString& background, const QString& foreground);
+    void setStyleSheet(const QString& background, const QString& foreground);
+    void setGameStyleSheet(const QString& background, const QString& foreground); // For main.cpp compatibility
 
 private:
     void setupUI();
@@ -285,6 +286,56 @@ private:
     
     QTimer* scrollTimer;
     QFont scrollFont;
+};
+
+// Enhanced Bowler Widget for advanced display modes
+class EnhancedBowlerWidget : public QFrame {
+    Q_OBJECT
+    
+public:
+    explicit EnhancedBowlerWidget(const Bowler& bowler, bool isCurrentPlayer = false, 
+                                 const QJsonObject& displayOptions = QJsonObject(), 
+                                 QWidget* parent = nullptr);
+    
+    void updateBowler(const Bowler& bowler, bool isCurrentPlayer = false);
+    void updateHighlight(bool isCurrentPlayer);
+    void setDisplayOptions(const QJsonObject& options);
+
+signals:
+    void bowlerClicked(const QString& bowlerName);
+
+protected:
+    void mousePressEvent(QMouseEvent* event) override;
+
+private:
+    struct FrameWidgetSet {
+        QFrame* container;
+        QVector<QLabel*> ballLabels;
+        QLabel* totalLabel;
+        int frameIndex;
+    };
+    
+    void setupEnhancedUI();
+    void createFrameDisplay();
+    void createAverageHandicapDisplay();
+    void createTotalScoreDisplay();
+    void updateDisplay();
+    void updateFrameWidget(const FrameWidgetSet& frameSet);
+    QString formatBallResult(const Ball& ball, int ballIndex, const Frame& frame);
+    
+    Bowler bowlerData;
+    bool isCurrentPlayer;
+    QJsonObject displayOptions;
+    
+    QGridLayout* mainLayout;
+    QLabel* nameLabel;
+    QLabel* scratchScoreLabel;
+    QLabel* withHandicapLabel = nullptr;
+    QLabel* avgValueLabel = nullptr;
+    QLabel* hdcpValueLabel = nullptr;
+    QLabel* threeSixNineLabel = nullptr;
+    
+    QVector<FrameWidgetSet> frameWidgets;
 };
 
 #endif // BOWLINGWIDGETS_H

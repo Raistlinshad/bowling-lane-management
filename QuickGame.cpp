@@ -451,6 +451,7 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     gamesPlayed = 0;
     
     qDebug() << "Game settings - time limit:" << timeLimit << "game limit:" << gameLimit;
+    startMachineInterface();
     
     // Initialize game state
     currentBowlerIndex = 0;
@@ -473,8 +474,8 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     emit gameUpdated();
     qDebug() << "Emitted gameUpdated() signal";
     
-    // Machine interface disabled for now
-    qDebug() << "Machine interface disabled";
+    // Start Machine Interface
+    startMachineInterface();
     
     // Start game timer if needed
     if (timeLimit > 0) {
@@ -1007,4 +1008,20 @@ bool QuickGame::validateBowlerData(const Bowler& bowler) const {
     }
     
     return true;
+}
+
+// Add ball processing integration:
+void QuickGame::onBallDetected(const QVector<int>& pins) {
+    qDebug() << "Ball detected with pins:" << pins;
+    
+    if (!gameActive || isHeld || bowlers.isEmpty()) {
+        qDebug() << "Ball ignored - game not active, held, or no bowlers";
+        return;
+    }
+    
+    // Process the ball through the game logic
+    processBall(pins);
+    
+    // Update UI
+    emit gameUpdated();
 }

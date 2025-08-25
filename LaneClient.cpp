@@ -481,5 +481,4 @@ bool LaneClient::validateConnection()
     
     // Return true if socket is still connected after sending
     return m_socket->state() == QTcpSocket::ConnectedState;
-
 }

@@ -13,6 +13,57 @@ import logging
 from queue import Queue, Empty
 import signal
 import os
+from logging.handlers import RotatingFileHandler
+
+def setup_logging(log_file_path='log.txt', max_log_size=10*1024*1024, backup_count=5):
+	# Create formatter for regular log messages
+	log_formatter = logging.Formatter(
+		'%(asctime)s - %(levelname)s - %(message)s', 
+		datefmt='%d/%m/%H:%M'
+	)
+	 
+	# Create console handler and set level
+	console_handler = logging.StreamHandler()
+	console_handler.setFormatter(log_formatter)
+	
+	# Create file handler with rotation to manage file size
+	file_handler = RotatingFileHandler(
+		log_file_path, 
+		maxBytes=max_log_size,
+		backupCount=backup_count
+	)
+	file_handler.setFormatter(log_formatter)
+	
+	# Get the root logger and set its level
+	root_logger = logging.getLogger()
+	root_logger.setLevel(logging.INFO)
+	
+	# Remove any existing handlers
+	for handler in root_logger.handlers[:]:
+		root_logger.removeHandler(handler)
+	
+	# Add our handlers
+	root_logger.addHandler(console_handler)
+	root_logger.addHandler(file_handler)
+	
+	# Add special startup entry with date and entry number
+	current_date = datetime.now().strftime('%d/%m/%Y')
+	
+	# Calculate entry number by counting existing entries in log file
+	entry_number = 1
+	if os.path.exists(log_file_path):
+		with open(log_file_path, 'r') as f:
+			for line in f:
+				if f"Log {current_date.split('/')[0]}/{current_date.split('/')[1]}" in line and "entry #" in line:
+					entry_number += 1
+	
+	# Log startup message
+	root_logger.info(f"Log {current_date} entry #{entry_number}")
+	
+	return root_logger
+
+logger = setup_logging()
+
 
 # Import your existing machine functions
 try:
