@@ -27,11 +27,14 @@
 #include <QProcess>
 #include "LaneClient.h"
 #include "QuickGame.h"
+#include "QuickGameDialog.h"
+#include "QuickStartDialog.h"
 #include "BowlingWidgets.h"
 #include "MediaManager.h"
 #include "ThreeSixNineTracker.h"
 #include "GameStatistics.h"
 #include "GameRecoveryManager.h"
+#include "MainWindow.h"
 
 // Main bowling window
 class BowlingMainWindow : public QMainWindow {
@@ -798,3 +801,4 @@ int main(int argc, char *argv[])
 
 
 #include "main.moc"
+
