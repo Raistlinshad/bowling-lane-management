@@ -34,7 +34,6 @@
 #include "ThreeSixNineTracker.h"
 #include "GameStatistics.h"
 #include "GameRecoveryManager.h"
-#include "MainWindow.h"
 
 // Main bowling window
 class BowlingMainWindow : public QMainWindow {
@@ -790,6 +789,7 @@ private:
     int currentGameNumber;
     QVector<ColorScheme> gameColors;
 };
+
 
 int main(int argc, char *argv[])
 {
