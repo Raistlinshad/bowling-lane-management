@@ -1,12 +1,13 @@
 ﻿#include <QCoreApplication>
-#include <QSettings>
+#include <QObject>
 #include <QDebug>
 #include <QTimer>
-#include <QJsonObject>
-#include <QJsonDocument>
-#include <QJsonArray>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QDateTime>
+#include <QSettings>
 #include "LaneClient.h"
 
 class LaneApplication : public QObject
@@ -225,6 +226,10 @@ private:
     
     int m_laneId;
     LaneClient *m_client;
+    QString m_serverHost;
+    quint16 m_serverPort;
+    QJsonObject m_laneSettings;
+    QJsonObject m_gameColors;
 };
 
 int main(int argc, char *argv[])
