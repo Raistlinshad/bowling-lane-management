@@ -6,8 +6,9 @@
 #include <QMap>
 #include <QString>
 
-class Ball; 
 class Bowler;
+class Frame;
+class Ball;
 
 class GameStatistics : public QObject {
     Q_OBJECT
@@ -59,4 +60,5 @@ private:
     QMap<QString, QVector<int>> currentStrikeSequences; // bowlerName -> frame numbers with strikes
     QString statisticsFilePath;
 };
+
 
