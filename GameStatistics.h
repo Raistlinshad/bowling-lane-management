@@ -1,5 +1,13 @@
 ﻿// GameStatistics.h - Track scores and achievements
 
+#include <QObject>
+#include <QVector>
+#include <QDateTime>
+#include <QMap>
+#include <QString>
+
+class Ball; 
+
 class GameStatistics : public QObject {
     Q_OBJECT
     

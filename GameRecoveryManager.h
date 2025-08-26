@@ -1,5 +1,10 @@
 ﻿// GameRecoveryManager.h
 
+#include <QObject>
+#include <QJsonObject>
+#include <QTimer>
+#include <QString>
+
 class GameRecoveryManager : public QObject {
     Q_OBJECT
     
