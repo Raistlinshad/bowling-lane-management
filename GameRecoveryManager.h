@@ -1,5 +1,8 @@
 ﻿// GameRecoveryManager.h
 
+#ifndef GAMERECOVERYMANAGER_H
+#define GAMERECOVERYMANAGER_H
+
 #include <QObject>
 #include <QJsonObject>
 #include <QTimer>
@@ -39,3 +42,4 @@ private:
     QTimer* recoveryTimer;
 };
 
+#endif  // GAMERECOVERYMANAGER_H

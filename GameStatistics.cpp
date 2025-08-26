@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <algorithm>
+#include <QWidget>
 
 // GameStatistics.cpp implementation
 GameStatistics::GameStatistics(QObject* parent) : QObject(parent) {

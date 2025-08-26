@@ -68,6 +68,20 @@ void GameRecoveryManager::checkForRecovery(QWidget* parent) {
     }
 }
 
+bool GameRecoveryManager::hasActiveGame() const {
+    return gameActive && !currentRecoveryData.isEmpty();
+}
+
+QJsonObject GameRecoveryManager::getActiveGameData() const {
+    return currentRecoveryData["game_state"].toObject();
+}
+
+void GameRecoveryManager::onRecoveryTimeout() {
+    qDebug() << "Recovery timeout - auto-declining";
+    markGameInactive();
+    emit recoveryDeclined();
+}
+
 void GameRecoveryManager::showRecoveryDialog(QWidget* parent) {
     QDialog* dialog = new QDialog(parent);
     dialog->setWindowTitle("Game Recovery");

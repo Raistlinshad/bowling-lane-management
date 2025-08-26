@@ -7,6 +7,7 @@
 #include <QString>
 
 class Ball; 
+class Bowler;
 
 class GameStatistics : public QObject {
     Q_OBJECT
