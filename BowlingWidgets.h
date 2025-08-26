@@ -1,10 +1,30 @@
 ﻿#ifndef BOWLINGWIDGETS_H
 #define BOWLINGWIDGETS_H
 
+// Add these at the top of BowlingWidgets.h:
+#include <QWidget>
+#include <QFrame>
+#include <QLabel>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QVector>
+#include <QTimer>
+#include <QPainter>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QGridLayout>
+#include <QJsonObject>
+#include <QString>
+#include <QPointF>
+
+
 // Forward declarations
 class QuickGame;
 class Bowler;
 class Frame;
+class Ball;
 
 // Canadian 5-pin display widget
 class PinDisplayWidget : public QWidget {
