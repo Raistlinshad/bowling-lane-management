@@ -96,6 +96,7 @@ public:
     bool isRunning() const;
     void sendCommand(const QString& command, const QJsonObject& data = QJsonObject());
     void machineReset();
+};
 
 signals:
     void ballDetected(const QVector<int>& pins);
@@ -260,7 +261,4 @@ private:
     static const int SPARE_VALUE = 15;
 };
 
-
 #endif // QUICKGAME_H
-
-

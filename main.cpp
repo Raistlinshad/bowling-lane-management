@@ -426,9 +426,6 @@ private:
         
         client->sendMessage(moveMessage);
         
-        // Reset local machine and show waiting message
-        game->machineReset();
-        
         // Hide game interface and show waiting screen
         gameInterfaceWidget->hide();
         messageScrollArea->setText("Waiting for other team...");

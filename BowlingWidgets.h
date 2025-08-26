@@ -1,26 +1,6 @@
 ﻿#ifndef BOWLINGWIDGETS_H
 #define BOWLINGWIDGETS_H
 
-#include <QWidget>
-#include <QFrame>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGridLayout>
-#include <QScrollArea>
-#include <QPushButton>
-#include <QPropertyAnimation>
-#include <QGraphicsOpacityEffect>
-#include <QTimer>
-#include <QFont>
-#include <QPalette>
-#include <QPixmap>
-#include <QPainter>
-#include <QStyleOption>
-#include <QVector>
-#include <QJsonObject>
-#include "QuickGame.h"
-
 // Forward declarations
 class QuickGame;
 class Bowler;

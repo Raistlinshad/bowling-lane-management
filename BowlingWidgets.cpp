@@ -8,6 +8,7 @@
 #include <QEasingCurve>
 #include "BowlingWidgets.moc"
 
+
 // Static constants for PinDisplayWidget - CORRECTED LAYOUT
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
     QPointF(0.15, 0.3),   // lTwo (top-left)
@@ -1213,5 +1214,4 @@ void ScrollTextWidget::onScrollTimer() {
 void ScrollTextWidget::calculateScrollParameters() {
     QFontMetrics fm(scrollFont);
     textWidth = fm.horizontalAdvance(scrollText);
-
 }
