@@ -28,7 +28,8 @@ void ThreeSixNineTracker::initialize(const QVector<QString>& bowlerNames,
         status.bowlerName = bowlerName;
         status.participating = (mode == ParticipationMode::Everyone);
         status.targetFrames = strikeFrames;
-        status.frameResults.resize(totalTargetFrames, false);
+        status.frameResults.resize(totalTargetFrames);
+        status.frameResults.fill(false);
         status.currentStatus = status.participating ? "Active" : "Not Participating";
         status.dotsRemaining = 2;
         status.strikesAchieved = 0;
@@ -178,4 +179,5 @@ QVector<ThreeSixNineTracker::ParticipantStatus> ThreeSixNineTracker::getAllStatu
         statuses.append(it.value());
     }
     return statuses;
+
 }
