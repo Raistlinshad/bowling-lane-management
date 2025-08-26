@@ -1,10 +1,12 @@
 ﻿#include "BowlingWidgets.h"
+
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QResizeEvent>
 #include <QPaintEvent>
 #include <QDebug>
 #include <QEasingCurve>
+#include "BowlingWidgets.moc"
 
 // Static constants for PinDisplayWidget - CORRECTED LAYOUT
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
@@ -1211,4 +1213,5 @@ void ScrollTextWidget::onScrollTimer() {
 void ScrollTextWidget::calculateScrollParameters() {
     QFontMetrics fm(scrollFont);
     textWidth = fm.horizontalAdvance(scrollText);
+
 }
