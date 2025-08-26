@@ -95,7 +95,7 @@ public:
     
     bool isRunning() const;
     void sendCommand(const QString& command, const QJsonObject& data = QJsonObject());
-    void machineReset() {sendMachineCommand("machine_reset", QJsonObject{{"immediate", true}});
+    void machineReset();
 }
 
 signals:
@@ -260,5 +260,6 @@ private:
     static const int STRIKE_VALUE = 15;
     static const int SPARE_VALUE = 15;
 };
+
 
 #endif // QUICKGAME_H
