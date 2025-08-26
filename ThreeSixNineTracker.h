@@ -1,4 +1,11 @@
 ﻿// ThreeSixNineTracker.h - Separate system for 3-6-9 tracking
+#ifndef THREESIXNINETRACKER_H
+#define THREESIXNINETRACKER_H
+
+#include <QObject>
+#include <QString>
+#include <QVector>
+#include <QMap>
 
 class ThreeSixNineTracker : public QObject {
     Q_OBJECT
