@@ -5,10 +5,7 @@
 #include <QDateTime>
 #include <QMap>
 #include <QString>
-
-class Bowler;
-class Frame;
-class Ball;
+#include "QuickGame.h"
 
 class GameStatistics : public QObject {
     Q_OBJECT
@@ -60,5 +57,6 @@ private:
     QMap<QString, QVector<int>> currentStrikeSequences; // bowlerName -> frame numbers with strikes
     QString statisticsFilePath;
 };
+
 
 
