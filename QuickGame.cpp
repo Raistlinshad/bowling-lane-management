@@ -799,10 +799,6 @@ QJsonObject QuickGame::getGameStatistics() const {
     return stats;
 }
 
-void QuickGame::onBallDetected(const QVector<int>& pins) {
-    processBall(pins);
-}
-
 void QuickGame::onMachineError(const QString& error) {
     qWarning() << "Machine error:" << error;
     emit errorOccurred(error);

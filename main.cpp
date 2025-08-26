@@ -35,6 +35,7 @@
 #include "GameStatistics.h"
 #include "GameRecoveryManager.h"
 
+
 // Main bowling window
 class BowlingMainWindow : public QMainWindow {
     Q_OBJECT
@@ -426,7 +427,7 @@ private:
         client->sendMessage(moveMessage);
         
         // Reset local machine and show waiting message
-        // game->sendMachineCommand("machine_reset", QJsonObject{{"immediate", true}});
+        game->machineReset();
         
         // Hide game interface and show waiting screen
         gameInterfaceWidget->hide();
@@ -789,7 +790,6 @@ private:
     int currentGameNumber;
     QVector<ColorScheme> gameColors;
 };
-
 
 int main(int argc, char *argv[])
 {

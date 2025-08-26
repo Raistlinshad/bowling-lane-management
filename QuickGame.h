@@ -95,6 +95,8 @@ public:
     
     bool isRunning() const;
     void sendCommand(const QString& command, const QJsonObject& data = QJsonObject());
+    void machineReset() {sendMachineCommand("machine_reset", QJsonObject{{"immediate", true}});
+}
 
 signals:
     void ballDetected(const QVector<int>& pins);
