@@ -66,3 +66,5 @@ private:
     bool participationLocked;       // After 2nd frame of 1st game
 };
 
+
+#endif // THREESIXNINETRACKER_H
