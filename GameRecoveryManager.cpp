@@ -1,4 +1,4 @@
-// GameRecoveryManager.cpp
+﻿// GameRecoveryManager.cpp
 
 #include <QWidget>
 #include <QFrame>
@@ -162,5 +162,4 @@ void GameRecoveryManager::loadRecoveryState() {
         
         file.close();
     }
-
 }

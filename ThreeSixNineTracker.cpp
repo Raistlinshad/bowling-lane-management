@@ -1,4 +1,25 @@
 ﻿// ThreeSixNineTracker.cpp
+
+#include <QWidget>
+#include <QFrame>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QGridLayout>
+#include <QScrollArea>
+#include <QPushButton>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
+#include <QTimer>
+#include <QFont>
+#include <QPalette>
+#include <QPixmap>
+#include <QPainter>
+#include <QStyleOption>
+#include <QVector>
+#include <QJsonObject>
+
+// Three Six Nine Tracking
 ThreeSixNineTracker::ThreeSixNineTracker(QObject* parent) 
     : QObject(parent), enabled(false), mode(ParticipationMode::Everyone),
       currentGameNumber(1), totalTargetFrames(7), participationLocked(false) {
