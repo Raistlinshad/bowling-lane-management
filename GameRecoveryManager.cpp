@@ -1,23 +1,21 @@
 ﻿// GameRecoveryManager.cpp
 
-#include <QWidget>
-#include <QFrame>
-#include <QLabel>
+#include "GameRecoveryManager.h"
+
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QDateTime>
+#include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGridLayout>
-#include <QScrollArea>
+#include <QLabel>
 #include <QPushButton>
-#include <QPropertyAnimation>
-#include <QGraphicsOpacityEffect>
 #include <QTimer>
 #include <QFont>
-#include <QPalette>
-#include <QPixmap>
-#include <QPainter>
-#include <QStyleOption>
-#include <QVector>
-#include <QJsonObject>
+#include <QDebug>
 
 // Game Recovery Implimentation
 GameRecoveryManager::GameRecoveryManager(QObject* parent) 

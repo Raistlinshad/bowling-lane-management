@@ -1,23 +1,16 @@
 ﻿// GameStatistics.cpp
 
-#include <QWidget>
-#include <QFrame>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGridLayout>
-#include <QScrollArea>
-#include <QPushButton>
-#include <QPropertyAnimation>
-#include <QGraphicsOpacityEffect>
-#include <QTimer>
-#include <QFont>
-#include <QPalette>
-#include <QPixmap>
-#include <QPainter>
-#include <QStyleOption>
-#include <QVector>
+#include "GameStatistics.h"
+
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
+#include <QDateTime>
+#include <QDebug>
+#include <algorithm>
 
 // GameStatistics.cpp implementation
 GameStatistics::GameStatistics(QObject* parent) : QObject(parent) {

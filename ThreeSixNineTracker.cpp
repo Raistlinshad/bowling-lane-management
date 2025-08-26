@@ -1,23 +1,9 @@
 ﻿// ThreeSixNineTracker.cpp
 
-#include <QWidget>
-#include <QFrame>
-#include <QLabel>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QGridLayout>
-#include <QScrollArea>
-#include <QPushButton>
-#include <QPropertyAnimation>
-#include <QGraphicsOpacityEffect>
+#include "ThreeSixNineTracker.h"
+
+#include <QDebug>
 #include <QTimer>
-#include <QFont>
-#include <QPalette>
-#include <QPixmap>
-#include <QPainter>
-#include <QStyleOption>
-#include <QVector>
-#include <QJsonObject>
 
 // Three Six Nine Tracking
 ThreeSixNineTracker::ThreeSixNineTracker(QObject* parent) 

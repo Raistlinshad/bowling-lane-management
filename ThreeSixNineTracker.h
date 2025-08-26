@@ -1,4 +1,4 @@
-﻿// ThreeSixNine.h - Separate system for 3-6-9 tracking
+﻿// ThreeSixNineTracker.h - Separate system for 3-6-9 tracking
 
 class ThreeSixNineTracker : public QObject {
     Q_OBJECT

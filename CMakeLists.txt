@@ -27,6 +27,7 @@ set(SOURCES
     GameStatistics.cpp
     GameRecoveryManager.cpp
     MediaManager.cpp
+    client_main.cpp
 )
 
 # Header files
