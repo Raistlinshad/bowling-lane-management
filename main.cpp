@@ -34,6 +34,7 @@
 #include "ThreeSixNineTracker.h"
 #include "GameStatistics.h"
 #include "GameRecoveryManager.h"
+#include "MainWindow.h"
 
 // Main bowling window
 class BowlingMainWindow : public QMainWindow {
@@ -160,7 +161,11 @@ private slots:
         // Record for statistics
         if (game) {
             // Create ball object for statistics
-            QVector<int> pins = ballData["pins"].toVariantList().toVector().toInt(); // Convert from QJsonArray
+            QJsonArray pinsArray = ballData["pins"].toArray();
+            QVector<int> pins;
+            for (const QJsonValue& val : pinsArray) {
+                pins.append(val.toInt());
+            }
             Ball ball(pins, ballValue);
             gameStatistics->recordBallThrown(bowlerName, frame, ball, isStrike, isSpare);
         }
@@ -322,10 +327,6 @@ private:
         gameLayout->addWidget(gameDisplayArea, 1);    // Takes most space
         gameLayout->addLayout(bottomBarLayout, 0);    // Fixed height bottom bar
     }
-
-    void GameStatusWidget::setGameStyleSheet(const QString& background, const QString& foreground) {
-        setStyleSheet(background, foreground);
-    }
     
     void initializeThreeSixNine(const QJsonObject& config) {
         if (!config["enabled"].toBool()) return;
@@ -369,7 +370,10 @@ private:
             bool isCurrent = (i == currentIdx);
             
             // Prepare display options for this bowler
-            QJsonObject displayOptions = currentGameData.value("display_options", QJsonObject()).toObject();
+            QJsonObject displayOptions;
+            if (currentGameData.contains("display_options")) {
+                displayOptions = currentGameData["display_options"].toObject();
+            }
             
             // Add 3-6-9 status if active
             if (threeSixNine->isActive()) {
@@ -423,7 +427,7 @@ private:
         client->sendMessage(moveMessage);
         
         // Reset local machine and show waiting message
-        game->sendMachineCommand("machine_reset", QJsonObject{{"immediate", true}});
+        // game->sendMachineCommand("machine_reset", QJsonObject{{"immediate", true}});
         
         // Hide game interface and show waiting screen
         gameInterfaceWidget->hide();
@@ -434,7 +438,10 @@ private:
     
     void handleScrollMessage(const QJsonObject& data) {
         QString text = data["text"].toString();
-        int duration = data.value("duration", 10000).toInt();
+        int duration = 10000; // default
+        if (data.contains("duration")) {
+            duration = data["duration"].toInt();
+        }
         
         messageScrollArea->setText(text);
         messageScrollArea->startScrolling();
@@ -619,7 +626,7 @@ private:
         settings.endGroup();
     }
     
-    void BowlingMainWindow::applyGameColors() {
+    void applyGameColors() {
         if (gameColors.isEmpty()) return;
     
         // Use modulo to cycle through colors
@@ -783,7 +790,6 @@ private:
     int currentGameNumber;
     QVector<ColorScheme> gameColors;
 };
-
 
 int main(int argc, char *argv[])
 {
