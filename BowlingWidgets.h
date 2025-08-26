@@ -18,6 +18,7 @@
 #include <QJsonObject>
 #include <QString>
 #include <QPointF>
+#include "QuickGame.h"
 
 
 // Forward declarations
@@ -337,5 +338,6 @@ private:
     
     QVector<FrameWidgetSet> frameWidgets;
 };
+
 
 #endif // BOWLINGWIDGETS_H
