@@ -1,4 +1,25 @@
-﻿// GameRecoveryManager.cpp
+// GameRecoveryManager.cpp
+
+#include <QWidget>
+#include <QFrame>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QGridLayout>
+#include <QScrollArea>
+#include <QPushButton>
+#include <QPropertyAnimation>
+#include <QGraphicsOpacityEffect>
+#include <QTimer>
+#include <QFont>
+#include <QPalette>
+#include <QPixmap>
+#include <QPainter>
+#include <QStyleOption>
+#include <QVector>
+#include <QJsonObject>
+
+// Game Recovery Implimentation
 GameRecoveryManager::GameRecoveryManager(QObject* parent) 
     : QObject(parent), gameActive(false), gameNumber(0) {
     
@@ -141,4 +162,5 @@ void GameRecoveryManager::loadRecoveryState() {
         
         file.close();
     }
+
 }
