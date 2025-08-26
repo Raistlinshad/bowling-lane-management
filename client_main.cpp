@@ -14,10 +14,6 @@ class LaneApplication : public QObject
 {
     Q_OBJECT
 
-class LaneApplication : public QObject
-{
-    Q_OBJECT
-
 public:
     LaneApplication(QObject *parent = nullptr)
         : QObject(parent)
@@ -246,5 +242,6 @@ int main(int argc, char *argv[])
     
     return app.exec();
 }
+
 
 #include "client_main.moc"
