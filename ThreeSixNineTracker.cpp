@@ -135,6 +135,23 @@ void ThreeSixNineTracker::setBowlerParticipation(const QString& bowlerName, bool
     emit statusChanged(bowlerName, participants[bowlerName].currentStatus);
 }
 
+void ThreeSixNineTracker::updateParticipantStatus(const QString& bowlerName) {
+    if (!participants.contains(bowlerName)) return;
+    
+    ParticipantStatus& status = participants[bowlerName];
+    
+    // Update status based on current state
+    if (status.strikesAchieved == totalTargetFrames) {
+        status.currentStatus = "Winner";
+    } else if (status.dotsRemaining == 0) {
+        status.currentStatus = "Eliminated";
+    } else if (status.participating) {
+        status.currentStatus = "Active";
+    } else {
+        status.currentStatus = "Not Participating";
+    }
+}
+
 bool ThreeSixNineTracker::canToggleParticipation() const {
     return mode == ParticipationMode::Selectable && !participationLocked;
 }
@@ -179,5 +196,4 @@ QVector<ThreeSixNineTracker::ParticipantStatus> ThreeSixNineTracker::getAllStatu
         statuses.append(it.value());
     }
     return statuses;
-
 }
