@@ -135,6 +135,11 @@ void ThreeSixNineTracker::setBowlerParticipation(const QString& bowlerName, bool
     emit statusChanged(bowlerName, participants[bowlerName].currentStatus);
 }
 
+bool ThreeSixNineTracker::isTargetFrame(int gameNumber, int frameNumber) const {
+    int absoluteFrame = (gameNumber - 1) * 10 + frameNumber;
+    return targetFrames.contains(absoluteFrame);
+}
+
 void ThreeSixNineTracker::updateParticipantStatus(const QString& bowlerName) {
     if (!participants.contains(bowlerName)) return;
     
@@ -150,6 +155,11 @@ void ThreeSixNineTracker::updateParticipantStatus(const QString& bowlerName) {
     } else {
         status.currentStatus = "Not Participating";
     }
+}
+
+void ThreeSixNineTracker::startNewGame(int gameNumber) {
+    currentGameNumber = gameNumber;
+    qDebug() << "3-6-9 tracker starting game" << gameNumber;
 }
 
 bool ThreeSixNineTracker::canToggleParticipation() const {

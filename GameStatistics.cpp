@@ -240,3 +240,33 @@ void GameStatistics::loadStatistics() {
     
     qDebug() << "Statistics loaded:" << highScores.size() << "high scores," << strikeRecords.size() << "strike records";
 }
+
+QVector<GameStatistics::HighScoreRecord> GameStatistics::getTopScores(int limit) const {
+    QVector<HighScoreRecord> result;
+    int count = qMin(limit, highScores.size());
+    for (int i = 0; i < count; ++i) {
+        result.append(highScores[i]);
+    }
+    return result;
+}
+
+QVector<GameStatistics::StrikeRecord> GameStatistics::getTopStrikeRecords(int limit) const {
+    QVector<StrikeRecord> result;
+    int count = qMin(limit, strikeRecords.size());
+    for (int i = 0; i < count; ++i) {
+        result.append(strikeRecords[i]);
+    }
+    return result;
+}
+
+QVector<GameStatistics::HighScoreRecord> GameStatistics::getRecentHighScores(int days) const {
+    QVector<HighScoreRecord> result;
+    QDateTime cutoff = QDateTime::currentDateTime().addDays(-days);
+    
+    for (const HighScoreRecord& record : highScores) {
+        if (record.dateTime >= cutoff) {
+            result.append(record);
+        }
+    }
+    return result;
+}

@@ -6,9 +6,9 @@
 #include <QPaintEvent>
 #include <QDebug>
 #include <QEasingCurve>
+#include <QFontMetrics>
 
-
-// Static constants for PinDisplayWidget - CORRECTED LAYOUT
+// Static constants for PinDisplayWidget
 const QVector<QPointF> PinDisplayWidget::pinPositions = {
     QPointF(0.15, 0.3),   // lTwo (top-left)
     QPointF(0.35, 0.45),  // lThree (upper-left) 
@@ -19,7 +19,6 @@ const QVector<QPointF> PinDisplayWidget::pinPositions = {
 
 const QStringList PinDisplayWidget::pinNames = {"L2", "L3", "C5", "R3", "R2"};
 const QVector<int> PinDisplayWidget::pinValues = {2, 3, 5, 3, 2};
-
 
 // PinDisplayWidget implementation
 PinDisplayWidget::PinDisplayWidget(QWidget* parent) 
@@ -134,7 +133,7 @@ void PinDisplayWidget::paintEvent(QPaintEvent* event) {
         
         if (isAnimating) {
             // During animation, show falling effect
-            qreal progress = m_animationProgress; // FIXED: Use member variable
+            qreal progress = m_animationProgress;
             bool finalState = animationEndStates[i] == 1;
             
             if (animationStartStates[i] == 1 && animationEndStates[i] == 0) {
@@ -272,286 +271,296 @@ QRect PinDisplayWidget::getPinRect(int pinIndex) const {
     return QRect(x, y, pinSize, pinSize);
 }
 
-// Enhanced BowlerWidget.cpp to match your frame layout specification:
+// EnhancedBowlerWidget implementation
+EnhancedBowlerWidget::EnhancedBowlerWidget(const Bowler& bowler, bool isCurrentPlayer, 
+                                         const QJsonObject& displayOptions, QWidget* parent)
+    : QFrame(parent), bowlerData(bowler), isCurrentPlayer(isCurrentPlayer), displayOptions(displayOptions),
+      mainLayout(nullptr), nameLabel(nullptr), scratchScoreLabel(nullptr), 
+      withHandicapLabel(nullptr), avgValueLabel(nullptr), hdcpValueLabel(nullptr), 
+      threeSixNineLabel(nullptr) {
+    setupEnhancedUI();
+}
 
-class EnhancedBowlerWidget : public QFrame {
-    Q_OBJECT
+void EnhancedBowlerWidget::updateBowler(const Bowler& bowler, bool isCurrentPlayer) {
+    bowlerData = bowler;
+    this->isCurrentPlayer = isCurrentPlayer;
+    updateHighlight(isCurrentPlayer);
+    updateDisplay();
+}
+
+void EnhancedBowlerWidget::updateHighlight(bool isCurrentPlayer) {
+    this->isCurrentPlayer = isCurrentPlayer;
     
-public:
-    explicit EnhancedBowlerWidget(const Bowler& bowler, bool isCurrentPlayer = false, 
-                                 const QJsonObject& displayOptions = QJsonObject(), QWidget* parent = nullptr)
-        : QFrame(parent), bowlerData(bowler), isCurrentPlayer(isCurrentPlayer), displayOptions(displayOptions) {
-        setupEnhancedUI();
-        updateDisplay();
+    if (isCurrentPlayer) {
+        setStyleSheet("QFrame { background-color: yellow; border: 3px solid red; }");
+    } else {
+        setStyleSheet("QFrame { background-color: lightblue; border: 1px solid black; }");
     }
-    
-private:
-    void setupEnhancedUI() {
-        setMinimumHeight(120);  // Taller for better visibility
-        setFrameStyle(QFrame::Box);
-        setLineWidth(2);
-        
-        mainLayout = new QGridLayout(this);
-        mainLayout->setSpacing(2);
-        mainLayout->setContentsMargins(5, 5, 5, 5);
-        
-        // Column widths: Name(25%), Frames(60%), Averages(7.5%), Total(7.5%)
-        
-        // BOWLER NAME (Left column)
-        nameLabel = new QLabel(bowlerData.name, this);
-        nameLabel->setFont(QFont("Arial", 18, QFont::Bold));
-        nameLabel->setAlignment(Qt::AlignCenter);
-        nameLabel->setStyleSheet("QLabel { border: 1px solid black; padding: 10px; }");
-        mainLayout->addWidget(nameLabel, 0, 0, 2, 1);  // Spans 2 rows
-        
-        // FRAMES AREA (Center columns)
-        createFrameDisplay();
-        
-        // AVERAGE/HANDICAP (Right-center column)
-        if (displayOptions.contains("show_average") || displayOptions.contains("show_handicap")) {
-            createAverageHandicapDisplay();
-        }
-        
-        // TOTAL SCORE (Far right column)
-        createTotalScoreDisplay();
-        
-        updateHighlight(isCurrentPlayer);
+}
+
+void EnhancedBowlerWidget::setDisplayOptions(const QJsonObject& options) {
+    displayOptions = options;
+    updateDisplay();
+}
+
+void EnhancedBowlerWidget::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        emit bowlerClicked(bowlerData.name);
     }
-    
-    void createFrameDisplay() {
-        // Determine frame display mode
-        QString displayMode = displayOptions.value("frame_mode", "ten_frame").toString();
-        int framesToShow = (displayMode == "four_frame") ? 4 : 10;
-        int startFrame = displayOptions.value("frame_start", 0).toInt();
+    QFrame::mousePressEvent(event);
+}
+
+void EnhancedBowlerWidget::setupEnhancedUI() {
+    setMinimumHeight(120);  // Taller for better visibility
+    setFrameStyle(QFrame::Box);
+    setLineWidth(2);
         
-        frameWidgets.clear();
+    mainLayout = new QGridLayout(this);
+    mainLayout->setSpacing(2);
+    mainLayout->setContentsMargins(5, 5, 5, 5);
         
-        for (int i = 0; i < framesToShow; ++i) {
-            int frameIndex = startFrame + i;
-            if (frameIndex >= 10) break;
-            
-            // Frame container
-            QFrame* frameContainer = new QFrame(this);
-            frameContainer->setFrameStyle(QFrame::Box);
-            frameContainer->setMinimumSize(80, 60);
-            
-            QVBoxLayout* frameLayout = new QVBoxLayout(frameContainer);
-            frameLayout->setSpacing(1);
-            frameLayout->setContentsMargins(2, 2, 2, 2);
-            
-            // Frame header
-            QLabel* frameHeader = new QLabel(QString("F%1").arg(frameIndex + 1), frameContainer);
-            frameHeader->setAlignment(Qt::AlignCenter);
-            frameHeader->setFont(QFont("Arial", 8, QFont::Bold));
-            frameHeader->setMaximumHeight(15);
-            
-            // Ball results area
-            QHBoxLayout* ballsLayout = new QHBoxLayout();
-            ballsLayout->setSpacing(1);
-            
-            // Create ball result labels (up to 3)
-            QVector<QLabel*> ballLabels;
-            for (int j = 0; j < 3; ++j) {
-                QLabel* ballLabel = new QLabel("-", frameContainer);
-                ballLabel->setAlignment(Qt::AlignCenter);
-                ballLabel->setFont(QFont("Arial", 10));
-                ballLabel->setMinimumSize(20, 20);
-                ballLabel->setStyleSheet("QLabel { border: 1px solid gray; }");
-                ballLabels.append(ballLabel);
-                ballsLayout->addWidget(ballLabel);
-            }
-            
-            // Frame total
-            QLabel* frameTotal = new QLabel("0", frameContainer);
-            frameTotal->setAlignment(Qt::AlignCenter);
-            frameTotal->setFont(QFont("Arial", 12, QFont::Bold));
-            frameTotal->setMinimumHeight(25);
-            frameTotal->setStyleSheet("QLabel { border: 1px solid black; background-color: lightgray; }");
-            
-            frameLayout->addWidget(frameHeader);
-            frameLayout->addLayout(ballsLayout);
-            frameLayout->addWidget(frameTotal);
-            
-            // Store widgets for updates
-            FrameWidgetSet frameSet;
-            frameSet.container = frameContainer;
-            frameSet.ballLabels = ballLabels;
-            frameSet.totalLabel = frameTotal;
-            frameSet.frameIndex = frameIndex;
-            frameWidgets.append(frameSet);
-            
-            // Add to main layout
-            mainLayout->addWidget(frameContainer, 0, 1 + i, 2, 1);
-        }
+    // Column widths: Name(25%), Frames(60%), Averages(7.5%), Total(7.5%)
+        
+    // BOWLER NAME (Left column)
+    nameLabel = new QLabel(bowlerData.name, this);
+    nameLabel->setFont(QFont("Arial", 18, QFont::Bold));
+    nameLabel->setAlignment(Qt::AlignCenter);
+    nameLabel->setStyleSheet("QLabel { border: 1px solid black; padding: 10px; }");
+    mainLayout->addWidget(nameLabel, 0, 0, 2, 1);  // Spans 2 rows
+        
+    // FRAMES AREA (Center columns)
+    createFrameDisplay();
+        
+    // AVERAGE/HANDICAP (Right-center column)
+    if (displayOptions.contains("show_average") || displayOptions.contains("show_handicap")) {
+        createAverageHandicapDisplay();
     }
+        
+    // TOTAL SCORE (Far right column)
+    createTotalScoreDisplay();
+        
+    updateHighlight(isCurrentPlayer);
+}
     
-    void createAverageHandicapDisplay() {
-        QFrame* avgHdcpFrame = new QFrame(this);
-        avgHdcpFrame->setFrameStyle(QFrame::Box);
-        avgHdcpFrame->setMinimumSize(80, 60);
+void EnhancedBowlerWidget::createFrameDisplay() {
+    // Determine frame display mode
+    QString displayMode = displayOptions.contains("frame_mode") ? 
+    displayOptions.value("frame_mode").toString() : QString("ten_frame");
+    int framesToShow = (displayMode == "four_frame") ? 4 : 10;
+    int startFrame = displayOptions.contains("frame_start") ? 
+    displayOptions.value("frame_start").toInt() : 0;
         
-        QVBoxLayout* avgHdcpLayout = new QVBoxLayout(avgHdcpFrame);
+    frameWidgets.clear();
         
-        // Average
-        if (displayOptions.contains("average")) {
-            QLabel* avgLabel = new QLabel("AVG", avgHdcpFrame);
-            avgLabel->setAlignment(Qt::AlignCenter);
-            avgLabel->setFont(QFont("Arial", 8));
+    for (int i = 0; i < framesToShow; ++i) {
+        int frameIndex = startFrame + i;
+        if (frameIndex >= 10) break;
             
-            avgValueLabel = new QLabel(QString::number(displayOptions.value("average", 0).toInt()), avgHdcpFrame);
-            avgValueLabel->setAlignment(Qt::AlignCenter);
-            avgValueLabel->setFont(QFont("Arial", 12, QFont::Bold));
+        // Frame container
+        QFrame* frameContainer = new QFrame(this);
+        frameContainer->setFrameStyle(QFrame::Box);
+        frameContainer->setMinimumSize(80, 60);
             
-            avgHdcpLayout->addWidget(avgLabel);
-            avgHdcpLayout->addWidget(avgValueLabel);
-        }
-        
-        // Handicap
-        if (displayOptions.contains("handicap")) {
-            QLabel* hdcpLabel = new QLabel("HDCP", avgHdcpFrame);
-            hdcpLabel->setAlignment(Qt::AlignCenter);
-            hdcpLabel->setFont(QFont("Arial", 8));
+        QVBoxLayout* frameLayout = new QVBoxLayout(frameContainer);
+        frameLayout->setSpacing(1);
+        frameLayout->setContentsMargins(2, 2, 2, 2);
             
-            hdcpValueLabel = new QLabel(QString::number(displayOptions.value("handicap", 0).toInt()), avgHdcpFrame);
-            hdcpValueLabel->setAlignment(Qt::AlignCenter);
-            hdcpValueLabel->setFont(QFont("Arial", 12, QFont::Bold));
+        // Frame header
+        QLabel* frameHeader = new QLabel(QString("F%1").arg(frameIndex + 1), frameContainer);
+        frameHeader->setAlignment(Qt::AlignCenter);
+        frameHeader->setFont(QFont("Arial", 8, QFont::Bold));
+        frameHeader->setMaximumHeight(15);
             
-            avgHdcpLayout->addWidget(hdcpLabel);
-            avgHdcpLayout->addWidget(hdcpValueLabel);
-        }
-        
-        int col = displayOptions.value("frame_mode", "ten_frame").toString() == "four_frame" ? 5 : 11;
-        mainLayout->addWidget(avgHdcpFrame, 0, col, 2, 1);
-    }
-    
-    void createTotalScoreDisplay() {
-        QFrame* totalFrame = new QFrame(this);
-        totalFrame->setFrameStyle(QFrame::Box);
-        totalFrame->setMinimumSize(100, 60);
-        
-        QVBoxLayout* totalLayout = new QVBoxLayout(totalFrame);
-        
-        // Scratch score
-        scratchScoreLabel = new QLabel(QString::number(bowlerData.totalScore), totalFrame);
-        scratchScoreLabel->setAlignment(Qt::AlignCenter);
-        scratchScoreLabel->setFont(QFont("Arial", 16, QFont::Bold));
-        scratchScoreLabel->setStyleSheet("QLabel { color: black; }");
-        
-        totalLayout->addWidget(scratchScoreLabel);
-        
-        // With handicap score (if applicable)
-        QString totalDisplayMode = displayOptions.value("total_display", "Scratch").toString();
-        if (totalDisplayMode != "Scratch" && displayOptions.contains("handicap")) {
-            int handicap = displayOptions.value("handicap", 0).toInt();
-            int withHandicap = bowlerData.totalScore + handicap;
+        // Ball results area
+        QHBoxLayout* ballsLayout = new QHBoxLayout();
+        ballsLayout->setSpacing(1);
             
-            withHandicapLabel = new QLabel(QString("(%1)").arg(withHandicap), totalFrame);
-            withHandicapLabel->setAlignment(Qt::AlignCenter);
-            withHandicapLabel->setFont(QFont("Arial", 12));
-            withHandicapLabel->setStyleSheet("QLabel { color: blue; }");
-            
-            totalLayout->addWidget(withHandicapLabel);
-        }
-        
-        // 3-6-9 status if applicable
-        if (displayOptions.contains("three_six_nine_status")) {
-            QString status = displayOptions.value("three_six_nine_status").toString();
-            if (!status.isEmpty()) {
-                threeSixNineLabel = new QLabel(status, totalFrame);
-                threeSixNineLabel->setAlignment(Qt::AlignCenter);
-                threeSixNineLabel->setFont(QFont("Arial", 10));
-                threeSixNineLabel->setStyleSheet("QLabel { color: green; }");
-                totalLayout->addWidget(threeSixNineLabel);
-            }
-        }
-        
-        int col = displayOptions.value("frame_mode", "ten_frame").toString() == "four_frame" ? 6 : 12;
-        mainLayout->addWidget(totalFrame, 0, col, 2, 1);
-    }
-    
-    void updateDisplay() {
-        // Update frame displays
-        for (const FrameWidgetSet& frameSet : frameWidgets) {
-            updateFrameWidget(frameSet);
-        }
-        
-        // Update totals
-        scratchScoreLabel->setText(QString::number(bowlerData.totalScore));
-        if (withHandicapLabel && displayOptions.contains("handicap")) {
-            int handicap = displayOptions.value("handicap", 0).toInt();
-            int withHandicap = bowlerData.totalScore + handicap;
-            withHandicapLabel->setText(QString("(%1)").arg(withHandicap));
-        }
-    }
-    
-    void updateFrameWidget(const FrameWidgetSet& frameSet) {
-        if (frameSet.frameIndex >= bowlerData.frames.size()) return;
-        
-        const Frame& frame = bowlerData.frames[frameSet.frameIndex];
-        
-        // Update ball results
-        for (int i = 0; i < frameSet.ballLabels.size(); ++i) {
-            if (i < frame.balls.size()) {
-                const Ball& ball = frame.balls[i];
-                QString ballText = formatBallResult(ball, i, frame);
-                frameSet.ballLabels[i]->setText(ballText);
-            } else {
-                frameSet.ballLabels[i]->setText("-");
-            }
-        }
-        
-        // Update frame total
-        if (frame.isComplete) {
-            frameSet.totalLabel->setText(QString::number(frame.totalScore));
-        } else {
-            frameSet.totalLabel->setText("...");
-        }
-    }
-    
-    QString formatBallResult(const Ball& ball, int ballIndex, const Frame& frame) {
-        if (ball.value == 15) {
-            return "X"; // Strike
-        } else if (ballIndex > 0) {
-            // Check for spare
-            int runningTotal = 0;
-            for (int i = 0; i <= ballIndex; ++i) {
-                runningTotal += frame.balls[i].value;
-            }
-            if (runningTotal == 15) {
-                return "/"; // Spare
-            }
-        }
-        return QString::number(ball.value);
-    }
-    
-private:
-    struct FrameWidgetSet {
-        QFrame* container;
+        // Create ball result labels (up to 3)
         QVector<QLabel*> ballLabels;
-        QLabel* totalLabel;
-        int frameIndex;
-    };
+        for (int j = 0; j < 3; ++j) {
+            QLabel* ballLabel = new QLabel("-", frameContainer);
+            ballLabel->setAlignment(Qt::AlignCenter);
+            ballLabel->setFont(QFont("Arial", 10));
+            ballLabel->setMinimumSize(20, 20);
+            ballLabel->setStyleSheet("QLabel { border: 1px solid gray; }");
+            ballLabels.append(ballLabel);
+            ballsLayout->addWidget(ballLabel);
+        }
+            
+        // Frame total
+        QLabel* frameTotal = new QLabel("0", frameContainer);
+        frameTotal->setAlignment(Qt::AlignCenter);
+        frameTotal->setFont(QFont("Arial", 12, QFont::Bold));
+        frameTotal->setMinimumHeight(25);
+        frameTotal->setStyleSheet("QLabel { border: 1px solid black; background-color: lightgray; }");
+            
+        frameLayout->addWidget(frameHeader);
+        frameLayout->addLayout(ballsLayout);
+        frameLayout->addWidget(frameTotal);
+            
+        // Store widgets for updates
+        FrameWidgetSet frameSet;
+        frameSet.container = frameContainer;
+        frameSet.ballLabels = ballLabels;
+        frameSet.totalLabel = frameTotal;
+        frameSet.frameIndex = frameIndex;
+        frameWidgets.append(frameSet);
+            
+        // Add to main layout
+        mainLayout->addWidget(frameContainer, 0, 1 + i, 2, 1);
+    }
+}
     
-    Bowler bowlerData;
-    bool isCurrentPlayer;
-    QJsonObject displayOptions;
+void EnhancedBowlerWidget::createAverageHandicapDisplay() {
+    QFrame* avgHdcpFrame = new QFrame(this);
+    avgHdcpFrame->setFrameStyle(QFrame::Box);
+    avgHdcpFrame->setMinimumSize(80, 60);
+        
+    QVBoxLayout* avgHdcpLayout = new QVBoxLayout(avgHdcpFrame);
+        
+    // Average
+    if (displayOptions.contains("average")) {
+        QLabel* avgLabel = new QLabel("AVG", avgHdcpFrame);
+        avgLabel->setAlignment(Qt::AlignCenter);
+        avgLabel->setFont(QFont("Arial", 8));
+            
+        avgValueLabel = new QLabel(QString::number(displayOptions.contains("average") ? 
+        displayOptions.value("average").toInt() : 0), avgHdcpFrame);
+        avgValueLabel->setAlignment(Qt::AlignCenter);
+        avgValueLabel->setFont(QFont("Arial", 12, QFont::Bold));
+            
+        avgHdcpLayout->addWidget(avgLabel);
+        avgHdcpLayout->addWidget(avgValueLabel);
+    }
+        
+    // Handicap
+    if (displayOptions.contains("handicap")) {
+        QLabel* hdcpLabel = new QLabel("HDCP", avgHdcpFrame);
+        hdcpLabel->setAlignment(Qt::AlignCenter);
+        hdcpLabel->setFont(QFont("Arial", 8));
+            
+        hdcpValueLabel = new QLabel(QString::number(displayOptions.contains("handicap") ? 
+        displayOptions.value("handicap").toInt() : 0), avgHdcpFrame);
+        hdcpValueLabel->setAlignment(Qt::AlignCenter);
+        hdcpValueLabel->setFont(QFont("Arial", 12, QFont::Bold));
+            
+        avgHdcpLayout->addWidget(hdcpLabel);
+        avgHdcpLayout->addWidget(hdcpValueLabel);
+    }
+        
+    int col = (displayOptions.contains("frame_mode") ? 
+    displayOptions.value("frame_mode").toString() : QString("ten_frame")) == "four_frame" ? 5 : 11;
+    mainLayout->addWidget(avgHdcpFrame, 0, col, 2, 1);
+}
     
-    QGridLayout* mainLayout;
-    QLabel* nameLabel;
-    QLabel* scratchScoreLabel;
-    QLabel* withHandicapLabel = nullptr;
-    QLabel* avgValueLabel = nullptr;
-    QLabel* hdcpValueLabel = nullptr;
-    QLabel* threeSixNineLabel = nullptr;
+void EnhancedBowlerWidget::createTotalScoreDisplay() {
+    QFrame* totalFrame = new QFrame(this);
+    totalFrame->setFrameStyle(QFrame::Box);
+    totalFrame->setMinimumSize(100, 60);
+        
+    QVBoxLayout* totalLayout = new QVBoxLayout(totalFrame);
+        
+    // Scratch score
+    scratchScoreLabel = new QLabel(QString::number(bowlerData.totalScore), totalFrame);
+    scratchScoreLabel->setAlignment(Qt::AlignCenter);
+    scratchScoreLabel->setFont(QFont("Arial", 16, QFont::Bold));
+    scratchScoreLabel->setStyleSheet("QLabel { color: black; }");
+        
+    totalLayout->addWidget(scratchScoreLabel);
+        
+    // With handicap score (if applicable)
+    QString totalDisplayMode = displayOptions.contains("total_display") ? 
+    displayOptions.value("total_display").toString() : QString("Scratch");
+    if (totalDisplayMode != "Scratch" && displayOptions.contains("handicap")) {
+        int handicap = displayOptions.contains("handicap") ? 
+        displayOptions.value("handicap").toInt() : 0;
+        int withHandicap = bowlerData.totalScore + handicap;
+            
+        withHandicapLabel = new QLabel(QString("(%1)").arg(withHandicap), totalFrame);
+        withHandicapLabel->setAlignment(Qt::AlignCenter);
+        withHandicapLabel->setFont(QFont("Arial", 12));
+        withHandicapLabel->setStyleSheet("QLabel { color: blue; }");
+            
+        totalLayout->addWidget(withHandicapLabel);
+    }
+        
+    // 3-6-9 status if applicable
+    if (displayOptions.contains("three_six_nine_status")) {
+        QString status = displayOptions.value("three_six_nine_status").toString();
+        if (!status.isEmpty()) {
+            threeSixNineLabel = new QLabel(status, totalFrame);
+            threeSixNineLabel->setAlignment(Qt::AlignCenter);
+            threeSixNineLabel->setFont(QFont("Arial", 10));
+            threeSixNineLabel->setStyleSheet("QLabel { color: green; }");
+            totalLayout->addWidget(threeSixNineLabel);
+        }
+    }
+        
+    int col = (displayOptions.contains("frame_mode") ? 
+    displayOptions.value("frame_mode").toString() : QString("ten_frame")) == "four_frame" ? 6 : 12;
+    mainLayout->addWidget(totalFrame, 0, col, 2, 1);
+}
     
-    QVector<FrameWidgetSet> frameWidgets;
-};
+void EnhancedBowlerWidget::updateDisplay() {
+    // Update frame displays
+    for (const FrameWidgetSet& frameSet : frameWidgets) {
+        updateFrameWidget(frameSet);
+    }
+        
+    // Update totals
+    scratchScoreLabel->setText(QString::number(bowlerData.totalScore));
+    if (withHandicapLabel && displayOptions.contains("handicap")) {
+        int handicap = displayOptions.contains("handicap") ? 
+        displayOptions.value("handicap").toInt() : 0;
+        int withHandicap = bowlerData.totalScore + handicap;
+        withHandicapLabel->setText(QString("(%1)").arg(withHandicap));
+    }
+}
+    
+void EnhancedBowlerWidget::updateFrameWidget(const FrameWidgetSet& frameSet) {
+    if (frameSet.frameIndex >= bowlerData.frames.size()) return;
+        
+    const Frame& frame = bowlerData.frames[frameSet.frameIndex];
+        
+    // Update ball results
+    for (int i = 0; i < frameSet.ballLabels.size(); ++i) {
+        if (i < frame.balls.size()) {
+            const Ball& ball = frame.balls[i];
+            QString ballText = formatBallResult(ball, i, frame);
+            frameSet.ballLabels[i]->setText(ballText);
+        } else {
+            frameSet.ballLabels[i]->setText("-");
+        }
+    }
+        
+    // Update frame total
+    if (frame.isComplete) {
+        frameSet.totalLabel->setText(QString::number(frame.totalScore));
+    } else {
+        frameSet.totalLabel->setText("...");
+    }
+}
+    
+QString EnhancedBowlerWidget::formatBallResult(const Ball& ball, int ballIndex, const Frame& frame) {
+    if (ball.value == 15) {
+        return "X"; // Strike
+    } else if (ballIndex > 0) {
+        // Check for spare
+        int runningTotal = 0;
+        for (int i = 0; i <= ballIndex; ++i) {
+            runningTotal += frame.balls[i].value;
+        }
+        if (runningTotal == 15) {
+            return "/"; // Spare
+        }
+    }
+    return QString::number(ball.value);
+}
 
-
-
-// BowlerWidget Game Status Widget
+// GameStatusWidget implementation
 GameStatusWidget::GameStatusWidget(QWidget* parent) 
-    : QFrame(parent), statusLabel(nullptr), frameLabel(nullptr), ballLabel(nullptr), pinDisplay(nullptr) {
+    : QFrame(parent), statusLabel(nullptr), frameLabel(nullptr), ballLabel(nullptr), 
+      pinDisplay(nullptr), mainLayout(nullptr) {
     setupUI();
     setFrameStyle(QFrame::Box);
     setLineWidth(2);
@@ -594,7 +603,7 @@ void GameStatusWidget::setupUI() {
     mainLayout->addStretch();
     
     // Default styling
-    setStyleSheet("QFrame { background-color: #3c3c3c; color: white; }", "white");
+    QFrame::setStyleSheet("QFrame { background-color: #3c3c3c; color: white; }");
 }
 
 void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ball, const QVector<int>& pinStates) {
@@ -666,12 +675,12 @@ void GameStatusWidget::setGameStyleSheet(const QString& background, const QStrin
     setStyleSheet(background, foreground);
 }
 
-
 // BowlerWidget implementation
 BowlerWidget::BowlerWidget(const Bowler& bowler, bool isCurrentPlayer, QWidget* parent)
     : QFrame(parent), bowlerData(bowler), isCurrentPlayer(isCurrentPlayer), 
       compactMode(false), showDetails(true), scoreAnimation(nullptr), 
-      playerChangeAnimation(nullptr), opacityEffect(nullptr) {
+      playerChangeAnimation(nullptr), opacityEffect(nullptr),
+      nameLabel(nullptr), grandTotalLabel(nullptr), mainLayout(nullptr) {
     
     setupUI(isCurrentPlayer);
     updateDisplay();
@@ -831,14 +840,18 @@ void BowlerWidget::createFrameWidgets() {
 }
 
 void BowlerWidget::updateDisplay() {
-    nameLabel->setText(bowlerData.name);
+    if (nameLabel) {
+        nameLabel->setText(bowlerData.name);
+    }
     
     for (int i = 0; i < 10; ++i) {
         updateFrameDisplay(i);
     }
     
     // Update grand total
-    grandTotalLabel->setText(QString::number(bowlerData.totalScore));
+    if (grandTotalLabel) {
+        grandTotalLabel->setText(QString::number(bowlerData.totalScore));
+    }
 }
 
 void BowlerWidget::updateFrameDisplay(int frameIndex) {
@@ -847,22 +860,27 @@ void BowlerWidget::updateFrameDisplay(int frameIndex) {
     const Frame& frame = bowlerData.frames[frameIndex];
     
     // Update ball display
-    frameLabels[frameIndex]->setText(frame.getDisplayText());
+    if (frameIndex < frameLabels.size() && frameLabels[frameIndex]) {
+        frameLabels[frameIndex]->setText(frame.getDisplayText());
+    }
     
     // Update frame total
-    if (frame.isComplete) {
-        totalLabels[frameIndex]->setText(QString::number(frame.totalScore));
-    } else if (!frame.balls.isEmpty()) {
-        totalLabels[frameIndex]->setText("...");
-    } else {
-        totalLabels[frameIndex]->setText("");
+    if (frameIndex < totalLabels.size() && totalLabels[frameIndex]) {
+        if (frame.isComplete) {
+            totalLabels[frameIndex]->setText(QString::number(frame.totalScore));
+        } else if (!frame.balls.isEmpty()) {
+            totalLabels[frameIndex]->setText("...");
+        } else {
+            totalLabels[frameIndex]->setText("");
+        }
     }
 }
 
 // BowlerListWidget implementation
 BowlerListWidget::BowlerListWidget(QWidget* parent) 
     : QScrollArea(parent), currentBowlerIndex(0), maxVisibleBowlers(6), 
-      animationEnabled(true), compactMode(false), rotationAnimation(nullptr) {
+      animationEnabled(true), compactMode(false), rotationAnimation(nullptr),
+      contentWidget(nullptr), contentLayout(nullptr) {
     setupUI();
 }
 
@@ -909,16 +927,9 @@ void BowlerListWidget::animatePlayerRotation(int fromIndex, int toIndex) {
         return;
     }
     
-    // Simple fade animation
-    if (!rotationAnimation) {
-        rotationAnimation = new QPropertyAnimation(this, "opacity");
-        connect(rotationAnimation, &QPropertyAnimation::finished, this, &BowlerListWidget::onRotationAnimationFinished);
-    }
-    
-    rotationAnimation->setDuration(300);
-    rotationAnimation->setStartValue(1.0);
-    rotationAnimation->setEndValue(0.8);
-    rotationAnimation->start();
+    // Simple fade animation would need QGraphicsOpacityEffect
+    // For now, just emit finished immediately
+    emit rotationAnimationFinished();
 }
 
 void BowlerListWidget::setColorScheme(const QJsonObject& colors) {
@@ -999,15 +1010,17 @@ QWidget* BowlerListWidget::createBowlerWidget(const Bowler& bowler, bool isCurre
 
 // GameControlWidget implementation
 GameControlWidget::GameControlWidget(QWidget* parent) 
-    : QFrame(parent), gameType("quick_game"), isHeld(false) {
+    : QFrame(parent), gameType("quick_game"), isHeld(false),
+      holdButton(nullptr), skipButton(nullptr), resetButton(nullptr), 
+      settingsButton(nullptr), buttonLayout(nullptr) {
     setupUI();
     setFrameStyle(QFrame::Box);
 }
 
 void GameControlWidget::setButtonsEnabled(bool hold, bool skip, bool reset) {
-    holdButton->setEnabled(hold);
-    skipButton->setEnabled(skip);
-    resetButton->setEnabled(reset);
+    if (holdButton) holdButton->setEnabled(hold);
+    if (skipButton) skipButton->setEnabled(skip);
+    if (resetButton) resetButton->setEnabled(reset);
 }
 
 void GameControlWidget::setHoldButtonState(bool isHeld) {
@@ -1020,15 +1033,15 @@ void GameControlWidget::setGameType(const QString& gameType) {
     
     // Show/hide buttons based on game type
     if (gameType == "quick_game") {
-        holdButton->show();
-        skipButton->show();
-        resetButton->show();
-        settingsButton->hide();
+        if (holdButton) holdButton->show();
+        if (skipButton) skipButton->show();
+        if (resetButton) resetButton->show();
+        if (settingsButton) settingsButton->hide();
     } else if (gameType == "league_game") {
-        holdButton->show();
-        skipButton->hide();
-        resetButton->show();
-        settingsButton->show();
+        if (holdButton) holdButton->show();
+        if (skipButton) skipButton->hide();
+        if (resetButton) resetButton->show();
+        if (settingsButton) settingsButton->show();
     }
 }
 
@@ -1038,10 +1051,10 @@ void GameControlWidget::setButtonColors(const QJsonObject& colors) {
 }
 
 void GameControlWidget::setButtonSize(const QSize& size) {
-    holdButton->setMinimumSize(size);
-    skipButton->setMinimumSize(size);
-    resetButton->setMinimumSize(size);
-    settingsButton->setMinimumSize(size);
+    if (holdButton) holdButton->setMinimumSize(size);
+    if (skipButton) skipButton->setMinimumSize(size);
+    if (resetButton) resetButton->setMinimumSize(size);
+    if (settingsButton) settingsButton->setMinimumSize(size);
 }
 
 void GameControlWidget::setupUI() {
@@ -1086,12 +1099,14 @@ void GameControlWidget::setupUI() {
 
 void GameControlWidget::updateButtonStates() {
     // Update hold button
-    if (isHeld) {
-        holdButton->setText("RESUME");
-        holdButton->setStyleSheet("QPushButton { background-color: red; color: white; font-size: 18px; font-weight: bold; }");
-    } else {
-        holdButton->setText("HOLD");
-        holdButton->setStyleSheet("QPushButton { background-color: green; color: white; font-size: 18px; font-weight: bold; }");
+    if (holdButton) {
+        if (isHeld) {
+            holdButton->setText("RESUME");
+            holdButton->setStyleSheet("QPushButton { background-color: red; color: white; font-size: 18px; font-weight: bold; }");
+        } else {
+            holdButton->setText("HOLD");
+            holdButton->setStyleSheet("QPushButton { background-color: green; color: white; font-size: 18px; font-weight: bold; }");
+        }
     }
     
     // Apply custom colors if available
@@ -1100,26 +1115,33 @@ void GameControlWidget::updateButtonStates() {
             buttonColors["hold_active"].toString("red") : 
             buttonColors["hold_inactive"].toString("green");
         
-        holdButton->setStyleSheet(QString(
-            "QPushButton { background-color: %1; color: white; font-size: 18px; font-weight: bold; }"
-        ).arg(holdColor));
+        if (holdButton) {
+            holdButton->setStyleSheet(QString(
+                "QPushButton { background-color: %1; color: white; font-size: 18px; font-weight: bold; }"
+            ).arg(holdColor));
+        }
         
         QString skipColor = buttonColors["skip"].toString("orange");
-        skipButton->setStyleSheet(QString(
-            "QPushButton { background-color: %1; color: white; font-size: 18px; font-weight: bold; }"
-        ).arg(skipColor));
+        if (skipButton) {
+            skipButton->setStyleSheet(QString(
+                "QPushButton { background-color: %1; color: white; font-size: 18px; font-weight: bold; }"
+            ).arg(skipColor));
+        }
         
         QString resetColor = buttonColors["reset"].toString("darkred");
-        resetButton->setStyleSheet(QString(
-            "QPushButton { background-color: %1; color: white; font-size: 18px; font-weight: bold; }"
-        ).arg(resetColor));
+        if (resetButton) {
+            resetButton->setStyleSheet(QString(
+                "QPushButton { background-color: %1; color: white; font-size: 18px; font-weight: bold; }"
+            ).arg(resetColor));
+        }
     }
 }
 
 // ScrollTextWidget implementation
 ScrollTextWidget::ScrollTextWidget(QWidget* parent) 
     : QLabel(parent), scrollSpeed(50), scrollDirection("left"), 
-      scrollPosition(0), textWidth(0), isScrolling(false) {
+      scrollPosition(0), textWidth(0), isScrolling(false),
+      scrollTimer(nullptr) {
     
     scrollTimer = new QTimer(this);
     connect(scrollTimer, &QTimer::timeout, this, &ScrollTextWidget::onScrollTimer);
@@ -1220,5 +1242,11 @@ void ScrollTextWidget::onScrollTimer() {
 
 void ScrollTextWidget::calculateScrollParameters() {
     QFontMetrics fm(scrollFont);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
     textWidth = fm.horizontalAdvance(scrollText);
+#else
+    textWidth = fm.width(scrollText);
+#endif
 }
+
+#include "BowlingWidgets.moc"

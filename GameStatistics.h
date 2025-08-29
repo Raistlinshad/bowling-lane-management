@@ -1,4 +1,6 @@
 ﻿// GameStatistics.h - Track scores and achievements
+#ifndef GAMESTATISTICS_H
+#define GAMESTATISTICS_H
 
 #include <QObject>
 #include <QVector>
@@ -59,4 +61,4 @@ private:
 };
 
 
-
+#endif // GAMESTATISTICS_H

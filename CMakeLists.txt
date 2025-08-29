@@ -123,60 +123,31 @@ else()
     list(APPEND HEADERS ThreeSixNineTracker.h)
 endif()
 
-# Add MediaManager if multimedia is available, otherwise create stub
-if(Qt5Multimedia_FOUND AND Qt5MultimediaWidgets_FOUND)
-    message(STATUS "Qt5 Multimedia components found - checking for MediaManager")
-    if(EXISTS ${CMAKE_SOURCE_DIR}/MediaManager.cpp)
-        message(STATUS "Using existing MediaManager.cpp")
-        list(APPEND SOURCES MediaManager.cpp)
-        list(APPEND HEADERS MediaManager.h)
+# Add MediaManager - only one version, no duplicates
+if(EXISTS ${CMAKE_SOURCE_DIR}/MediaManager.cpp AND EXISTS ${CMAKE_SOURCE_DIR}/MediaManager.h)
+    message(STATUS "Using existing MediaManager.cpp")
+    # MediaManager.cpp and MediaManager.h are already in SOURCES and HEADERS lists above
+    if(Qt5Multimedia_FOUND AND Qt5MultimediaWidgets_FOUND)
         add_definitions(-DMULTIMEDIA_SUPPORT)
+        message(STATUS "MediaManager built with multimedia support")
     else()
-        message(STATUS "MediaManager.cpp not found, creating multimedia stub")
-        file(WRITE ${CMAKE_BINARY_DIR}/MediaManagerStub.cpp
-            "#include <QStackedWidget>\n"
-            "#include <QLabel>\n"
-            "#include <QVBoxLayout>\n"
-            "#include <QTimer>\n"
-            "class MediaManager : public QStackedWidget {\n"
-            "    Q_OBJECT\n"
-            "public:\n"
-            "    MediaManager(QWidget* parent = nullptr) : QStackedWidget(parent) {\n"
-            "        QWidget* stub = new QWidget(this);\n"
-            "        stub->setStyleSheet(\"background-color: blue;\");\n"
-            "        QLabel* label = new QLabel(\"Media Display\\n(Multimedia available but MediaManager.cpp missing)\", stub);\n"
-            "        label->setStyleSheet(\"color: white; font-size: 18px;\");\n"
-            "        label->setAlignment(Qt::AlignCenter);\n"
-            "        QVBoxLayout* layout = new QVBoxLayout(stub);\n"
-            "        layout->addWidget(label);\n"
-            "        addWidget(stub);\n"
-            "    }\n"
-            "    void showGameDisplay(QWidget* w) { if(w) { removeWidget(widget(0)); addWidget(w); setCurrentWidget(w); } }\n"
-            "    void showEffect(const QString& e, int d = 2000) { QTimer::singleShot(d, [this,e](){ emit effectFinished(e); }); emit effectStarted(e); }\n"
-            "    void showMediaRotation() {}\n"
-            "    void loadSettings(const QJsonObject&) {}\n"
-            "signals:\n"
-            "    void effectStarted(const QString& effect);\n"
-            "    void effectFinished(const QString& effect);\n"
-            "};\n"
-            "#include \"MediaManagerStub.moc\"\n"
-        )
-        list(APPEND SOURCES ${CMAKE_BINARY_DIR}/MediaManagerStub.cpp)
+        message(STATUS "MediaManager built without multimedia support (using stubs)")
     endif()
 else()
-    message(STATUS "Building without multimedia support")
+    message(STATUS "Creating MediaManager stub - MediaManager.cpp not found")
     file(WRITE ${CMAKE_BINARY_DIR}/MediaManagerStub.cpp
         "#include <QStackedWidget>\n"
         "#include <QLabel>\n"
         "#include <QVBoxLayout>\n"
         "#include <QTimer>\n"
+        "#include <QJsonObject>\n"
         "class MediaManager : public QStackedWidget {\n"
         "    Q_OBJECT\n"
         "public:\n"
         "    MediaManager(QWidget* parent = nullptr) : QStackedWidget(parent) {\n"
         "        QWidget* stub = new QWidget(this);\n"
         "        stub->setStyleSheet(\"background-color: blue;\");\n"
-        "        QLabel* label = new QLabel(\"Media Display\\n(Multimedia disabled)\", stub);\n"
+        "        QLabel* label = new QLabel(\"Media Display\\n(MediaManager.cpp missing)\", stub);\n"
         "        label->setStyleSheet(\"color: white; font-size: 18px;\");\n"
         "        label->setAlignment(Qt::AlignCenter);\n"
         "        QVBoxLayout* layout = new QVBoxLayout(stub);\n"
@@ -193,9 +164,11 @@ else()
         "};\n"
         "#include \"MediaManagerStub.moc\"\n"
     )
+    # Remove MediaManager.cpp and MediaManager.h from the lists and add the stub
+    list(REMOVE_ITEM SOURCES MediaManager.cpp)
+    list(REMOVE_ITEM HEADERS MediaManager.h)
     list(APPEND SOURCES ${CMAKE_BINARY_DIR}/MediaManagerStub.cpp)
 endif()
-
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 

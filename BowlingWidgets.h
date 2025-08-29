@@ -1,7 +1,7 @@
 ﻿#ifndef BOWLINGWIDGETS_H
 #define BOWLINGWIDGETS_H
 
-// Add these at the top of BowlingWidgets.h:
+// Qt5 compatible includes
 #include <QWidget>
 #include <QFrame>
 #include <QLabel>
@@ -18,8 +18,20 @@
 #include <QJsonObject>
 #include <QString>
 #include <QPointF>
+#include <QMouseEvent>
+#include <QKeyEvent>
+#include <QResizeEvent>
+#include <QPaintEvent>
+#include <QDebug>
+#include <QEasingCurve>
+#include <QFont>
+#include <QFontMetrics>
+#include <QColor>
+#include <QBrush>
+#include <QPen>
+#include <QRect>
+#include <QSize>
 #include "QuickGame.h"
-
 
 // Forward declarations
 class QuickGame;
@@ -289,7 +301,7 @@ private:
     QFont scrollFont;
 };
 
-// Enhanced Bowler Widget for advanced display modes
+// Enhanced BowlerWidget for advanced frame layout
 class EnhancedBowlerWidget : public QFrame {
     Q_OBJECT
     
@@ -315,10 +327,10 @@ private:
         QLabel* totalLabel;
         int frameIndex;
     };
-    
+
     void setupEnhancedUI();
     void createFrameDisplay();
-    void createAverageHandicapDisplay();
+    void createAverageHandicapDisplay(); 
     void createTotalScoreDisplay();
     void updateDisplay();
     void updateFrameWidget(const FrameWidgetSet& frameSet);
@@ -331,10 +343,10 @@ private:
     QGridLayout* mainLayout;
     QLabel* nameLabel;
     QLabel* scratchScoreLabel;
-    QLabel* withHandicapLabel = nullptr;
-    QLabel* avgValueLabel = nullptr;
-    QLabel* hdcpValueLabel = nullptr;
-    QLabel* threeSixNineLabel = nullptr;
+    QLabel* withHandicapLabel;
+    QLabel* avgValueLabel;
+    QLabel* hdcpValueLabel;
+    QLabel* threeSixNineLabel;
     
     QVector<FrameWidgetSet> frameWidgets;
 };
