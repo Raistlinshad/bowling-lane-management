@@ -31,7 +31,8 @@ void MediaManager::setupUI() {
     
     mediaPlayer = new QMediaPlayer(this);
     connect(mediaPlayer, &QMediaPlayer::stateChanged, this, &MediaManager::onVideoStateChanged);
-    connect(mediaPlayer, &QMediaPlayer::errorOccurred, this, &MediaManager::onVideoError);
+    connect(mediaPlayer, static_cast<void(QMediaPlayer::*)(QMediaPlayer::Error)>(&QMediaPlayer::error), 
+            this, &MediaManager::onVideoError);
     
     // Start with stub display
     setCurrentWidget(stubDisplayWidget);
