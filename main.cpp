@@ -1,4 +1,4 @@
-﻿#include <QApplication>
+#include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -363,74 +363,76 @@ private slots:
 private:
     void setupGameInterface() {
         QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
-        gameLayout->setContentsMargins(10, 10, 10, 10);
-        gameLayout->setSpacing(5);
+        gameLayout->setContentsMargins(0, 0, 0, 0); // Remove all margins
+        gameLayout->setSpacing(0); // Remove spacing
     
-        // MAIN GAME AREA (takes most of screen space - optimized for 1920x1080)
+        // MAIN GAME AREA - Set to fill entire available space
         gameDisplayArea = new QScrollArea(this);
         gameDisplayArea->setWidgetResizable(true);
-        gameDisplayArea->setMinimumHeight(800);
-        gameDisplayArea->setStyleSheet("QScrollArea { border: 2px solid #555555; background-color: #2b2b2b; }");
+        gameDisplayArea->setStyleSheet("QScrollArea { border: none; background-color: #2b2b2b; }");
     
         gameWidget = new QWidget();
         gameWidgetLayout = new QVBoxLayout(gameWidget);
+        gameWidgetLayout->setContentsMargins(10, 0, 10, 50); // Bottom margin for button space
         gameDisplayArea->setWidget(gameWidget);
     
-        // BOTTOM CONTROL BAR (horizontal layout with reduced height and black background)
+        // BOTTOM CONTROL BAR - Add directly to gameWidget layout, not separate widget
         QHBoxLayout* bottomBarLayout = new QHBoxLayout();
         bottomBarLayout->setSpacing(10);
-        bottomBarLayout->setContentsMargins(5, 2, 5, 2); // Reduced vertical margins
+        bottomBarLayout->setContentsMargins(10, 5, 10, 5);
     
-        // Left: Control Buttons (reduced size)
-        QHBoxLayout* buttonLayout = new QHBoxLayout();
+        // Left: Control Buttons
         holdButton = new QPushButton("HOLD", this);
         skipButton = new QPushButton("SKIP", this);
         resetButton = new QPushButton("RESET", this);
     
-        holdButton->setMinimumSize(100, 40); // Reduced from 120x60
-        skipButton->setMinimumSize(100, 40);
-        resetButton->setMinimumSize(100, 40);
+        holdButton->setFixedSize(100, 40);
+        skipButton->setFixedSize(100, 40);
+        resetButton->setFixedSize(100, 40);
     
         connect(holdButton, &QPushButton::clicked, this, &BowlingMainWindow::onHoldClicked);
         connect(skipButton, &QPushButton::clicked, this, &BowlingMainWindow::onSkipClicked);
         connect(resetButton, &QPushButton::clicked, this, &BowlingMainWindow::onResetClicked);
     
-        buttonLayout->addWidget(holdButton);
-        buttonLayout->addWidget(skipButton);
-        buttonLayout->addWidget(resetButton);
+        bottomBarLayout->addWidget(holdButton);
+        bottomBarLayout->addWidget(skipButton);
+        bottomBarLayout->addWidget(resetButton);
+        bottomBarLayout->addSpacing(20); // Space between buttons and message area
     
-        // Center: Scrolling Message Area (reduced height)
+        // Center: Scrolling Message Area
         messageScrollArea = new ScrollTextWidget(this);
         messageScrollArea->setText("Welcome to Canadian 5-Pin Bowling");
-        messageScrollArea->setMinimumHeight(40); // Reduced from 60
+        messageScrollArea->setFixedHeight(40);
         messageScrollArea->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 14px; border: 1px solid #555555; }");
     
-        // Right: Pin Display (reduced size)
+        // Right: Pin Display
         pinDisplay = new PinDisplayWidget(this);
         pinDisplay->setDisplayMode("small");
-        pinDisplay->setMinimumSize(120, 40); // Reduced from 140x60
-        pinDisplay->setMaximumSize(140, 40);
+        pinDisplay->setFixedSize(120, 40);
         
         // Far Right: Lane Status for call mode
         laneStatusLabel = new QLabel(QString("Lane %1").arg(1), this);
-        laneStatusLabel->setMinimumSize(80, 40);
+        laneStatusLabel->setFixedSize(80, 40);
         laneStatusLabel->setAlignment(Qt::AlignCenter);
         laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
     
-        // Assemble bottom bar with black background
-        QWidget* bottomBarWidget = new QWidget(this);
-        bottomBarWidget->setStyleSheet("QWidget { background-color: black; }");
-        bottomBarWidget->setMaximumHeight(50); // Limit height
-        bottomBarWidget->setLayout(bottomBarLayout);
-        
-        bottomBarLayout->addLayout(buttonLayout, 0);          // Fixed width buttons
         bottomBarLayout->addWidget(messageScrollArea, 1);     // Expandable message area
-        bottomBarLayout->addWidget(pinDisplay, 0);            // Fixed width pin display
-        bottomBarLayout->addWidget(laneStatusLabel, 0);       // Fixed width lane status
+        bottomBarLayout->addSpacing(10);
+        bottomBarLayout->addWidget(pinDisplay);
+        bottomBarLayout->addWidget(laneStatusLabel);
     
-        // Assemble main layout
-        gameLayout->addWidget(gameDisplayArea, 1);    // Takes most space
-        gameLayout->addWidget(bottomBarWidget, 0);    // Fixed height bottom bar
+        // Create a bottom bar widget that sits at the bottom of the game widget
+        QWidget* bottomBarContainer = new QWidget();
+        bottomBarContainer->setFixedHeight(50);
+        bottomBarContainer->setStyleSheet("QWidget { background-color: black; }");
+        bottomBarContainer->setLayout(bottomBarLayout);
+        
+        // Add bottom bar to the game widget layout (so it appears inside the scroll area at the bottom)
+        gameWidgetLayout->addStretch(); // Push everything up
+        gameWidgetLayout->addWidget(bottomBarContainer); // Add bottom bar at the end
+    
+        // Assemble main layout - only the scroll area, no separate bottom widget
+        gameLayout->addWidget(gameDisplayArea, 1);    // Takes entire space
     }
     
     void updateButtonStates() {
