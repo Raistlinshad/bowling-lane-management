@@ -757,6 +757,8 @@ private:
         }
     }
 
+#include "main.moc"
+
 int main(int argc, char *argv[]) {
     Qapplication app(argc, argv);
 
@@ -765,3 +767,4 @@ int main(int argc, char *argv[]) {
 
     return app.exec()
 }
+
