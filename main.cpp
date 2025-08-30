@@ -654,20 +654,22 @@ private:
         QWidget* centralWidget = new QWidget(this);
         setCentralWidget(centralWidget);
         
+        // Create main layout with no margins or spacing
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
+        mainLayout->setContentsMargins(0, 0, 0, 0);
+        mainLayout->setSpacing(0);
         
         // Media display area (full screen when no game)
         mediaDisplay = new MediaManager(this);
-        mediaDisplay->setMinimumHeight(600);
         
         // Game interface container (hidden by default)
         gameInterfaceWidget = new QWidget(this);
         gameInterfaceWidget->hide();
         setupGameInterface();
         
-        // Layout assembly
+        // Layout assembly - both widgets take full space when visible
         mainLayout->addWidget(mediaDisplay, 1);
-        mainLayout->addWidget(gameInterfaceWidget, 0);
+        mainLayout->addWidget(gameInterfaceWidget, 1);
         
         // Start with media display only
         mediaDisplay->showMediaRotation();
@@ -675,15 +677,30 @@ private:
     
     void showGameInterface() {
         qDebug() << "=== SHOWING GAME INTERFACE ===";
-        mediaDisplay->setMaximumHeight(400);
+        
+        // Hide the media display completely during game
+        mediaDisplay->hide();
+        
+        // Show game interface and make it fill entire window
         gameInterfaceWidget->show();
-        mediaDisplay->showGameDisplay(gameDisplayArea);
+        gameInterfaceWidget->setParent(centralWidget());
+        
+        // Update layout to give game interface full space
+        QVBoxLayout* mainLayout = static_cast<QVBoxLayout*>(centralWidget()->layout());
+        mainLayout->setContentsMargins(0, 0, 0, 0);
+        mainLayout->setSpacing(0);
+        
         qDebug() << "=== GAME INTERFACE DISPLAY COMPLETE ===";
     }
     
     void hideGameInterface() {
+        // Show media display and hide game interface
+        mediaDisplay->show();
         gameInterfaceWidget->hide();
-        mediaDisplay->setMaximumHeight(QWIDGETSIZE_MAX);
+        
+        // Restore normal layout spacing
+        QVBoxLayout* mainLayout = static_cast<QVBoxLayout*>(centralWidget()->layout());
+        mainLayout->setContentsMargins(5, 5, 5, 5);
     }
     
     void setupClient() {
