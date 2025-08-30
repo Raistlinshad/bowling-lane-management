@@ -147,6 +147,7 @@ public:
     // Score management
     void updateScore(const QJsonObject& scoreData);
     void recalculateScores();
+    void sendMachineCommand(const QString& command, const QJsonObject& data = QJsonObject());
     
     // Game state queries
     const QVector<Bowler>& getBowlers() const { return bowlers; }
@@ -219,7 +220,6 @@ private:
     // Machine communication
     void startMachineInterface();
     void stopMachineInterface();
-    void sendMachineCommand(const QString& command, const QJsonObject& data = QJsonObject());
     
     // Game state validation
     bool validateGameState() const;
@@ -259,5 +259,6 @@ private:
     static const int STRIKE_VALUE = 15;
     static const int SPARE_VALUE = 15;
 };
+
 
 #endif // QUICKGAME_H
