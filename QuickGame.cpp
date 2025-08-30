@@ -451,6 +451,9 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     gamesPlayed = 0;
     
     qDebug() << "Game settings - time limit:" << timeLimit << "game limit:" << gameLimit;
+    
+    // CRITICAL: Start machine interface BEFORE activating game
+    qDebug() << "Starting machine interface for ball detection";
     startMachineInterface();
     
     // Initialize game state
@@ -473,9 +476,6 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     qDebug() << "About to emit gameUpdated() signal";
     emit gameUpdated();
     qDebug() << "Emitted gameUpdated() signal";
-    
-    // Start Machine Interface
-    startMachineInterface();
     
     // Start game timer if needed
     if (timeLimit > 0) {
@@ -956,7 +956,20 @@ void QuickGame::checkForSpecialEvents(const Ball& ball, const Frame& frame) {
 
 void QuickGame::startMachineInterface() {
     if (machineEnabled && machine) {
+        qDebug() << "Starting machine interface for ball detection";
         machine->startDetection();
+        
+        // Verify machine is running
+        QTimer::singleShot(2000, this, [this]() {
+            if (machine->isRunning()) {
+                qDebug() << "Machine interface successfully started and running";
+            } else {
+                qWarning() << "Machine interface failed to start properly";
+                emit errorOccurred("Ball detection system failed to start");
+            }
+        });
+    } else {
+        qDebug() << "Machine interface disabled or not available";
     }
 }
 
@@ -968,7 +981,10 @@ void QuickGame::stopMachineInterface() {
 
 void QuickGame::sendMachineCommand(const QString& command, const QJsonObject& data) {
     if (machine && machine->isRunning()) {
+        qDebug() << "Sending machine command:" << command;
         machine->sendCommand(command, data);
+    } else {
+        qWarning() << "Cannot send machine command - interface not running";
     }
 }
 

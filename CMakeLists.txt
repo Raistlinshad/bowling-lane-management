@@ -201,11 +201,32 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/settings.ini)
     configure_file(${CMAKE_SOURCE_DIR}/settings.ini ${CMAKE_BINARY_DIR}/settings.ini COPYONLY)
 endif()
 
-# Create directories
+# Create media directory structure
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/ads)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/ads/images)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/ads/videos)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects/videos)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects/images)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects/audio)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/logs)
 
-message(STATUS "Build configuration complete")
-message(STATUS "  Multimedia support: ${Qt5Multimedia_FOUND}")
-message(STATUS "  Multimedia widgets: ${Qt5MultimediaWidgets_FOUND}")
-message(STATUS "  Manager class stubs created as needed")
+# Create placeholder files to show directory structure
+file(WRITE ${CMAKE_BINARY_DIR}/media/ads/images/README.txt 
+    "Place advertisement images here.\nSupported formats: jpg, jpeg, png, bmp, gif\n")
+file(WRITE ${CMAKE_BINARY_DIR}/media/ads/videos/README.txt 
+    "Place advertisement videos here.\nSupported formats: mp4, avi, mov, mkv\n")
+file(WRITE ${CMAKE_BINARY_DIR}/media/effects/videos/README.txt 
+    "Place effect celebration videos here.\nFiles should be named:\n- strike.mp4\n- spare.mp4\n- turkey.mp4\n- perfect.mp4\n- split.mp4\n")
+file(WRITE ${CMAKE_BINARY_DIR}/media/effects/images/README.txt 
+    "Place effect celebration images here.\nFiles should be named:\n- strike.png\n- spare.png\n- turkey.png\n- perfect.png\n")
+file(WRITE ${CMAKE_BINARY_DIR}/media/effects/audio/README.txt 
+    "Place effect celebration audio here.\nFiles should be named:\n- strike.wav\n- spare.wav\n- turkey.wav\n- perfect.wav\n")
+
+message(STATUS "Media directory structure created")
+message(STATUS "  Advertisement images: ${CMAKE_BINARY_DIR}/media/ads/images/")  
+message(STATUS "  Advertisement videos: ${CMAKE_BINARY_DIR}/media/ads/videos/")
+message(STATUS "  Effect videos: ${CMAKE_BINARY_DIR}/media/effects/videos/")
+message(STATUS "  Effect images: ${CMAKE_BINARY_DIR}/media/effects/images/")
+message(STATUS "  Effect audio: ${CMAKE_BINARY_DIR}/media/effects/audio/")
