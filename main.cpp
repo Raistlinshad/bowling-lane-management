@@ -755,4 +755,7 @@ private:
         if (gameStatus) {
             gameStatus->setGameStyleSheet(scheme.background, scheme.foreground);
         }
+
     }
+
+#include "main.moc"
