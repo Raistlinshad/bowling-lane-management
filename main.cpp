@@ -755,7 +755,13 @@ private:
         if (gameStatus) {
             gameStatus->setGameStyleSheet(scheme.background, scheme.foreground);
         }
-
     }
 
+int main(int argc, char *argv[]) {
+    Qapplication app(argc, argv);
 
+    BowlingMainWindow window;
+    window.show();
+
+    return app.exec()
+}
