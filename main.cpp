@@ -757,15 +757,21 @@ private:
         }
     }
 
-#include "main.moc"
-
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     QApplication app(argc, argv);
-
+    
+    app.setApplicationName("Canadian5PinBowling");
+    app.setApplicationVersion("1.0");
+    app.setOrganizationName("BowlingCenter");
+    
     BowlingMainWindow window;
     window.show();
-
-    return app.exec()
+    
+    return app.exec();
 }
+
+#include "main.moc"
+
 
 
