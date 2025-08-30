@@ -1248,5 +1248,3 @@ void ScrollTextWidget::calculateScrollParameters() {
     textWidth = fm.width(scrollText);
 #endif
 }
-
-#include "BowlingWidgets.moc"
