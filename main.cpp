@@ -760,11 +760,12 @@ private:
 #include "main.moc"
 
 int main(int argc, char *argv[]) {
-    Qapplication app(argc, argv);
+    QApplication app(argc, argv);
 
     BowlingMainWindow window;
     window.show();
 
     return app.exec()
 }
+
 
