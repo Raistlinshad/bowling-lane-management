@@ -7,6 +7,8 @@
 #include <QPushButton>
 #include <QFrame>
 #include <QScrollArea>
+#include <QThreadPool>
+#include <QPixmapCache>
 #include <QTimer>
 #include <QStackedWidget>
 #include <QPropertyAnimation>
@@ -1012,3 +1014,4 @@ int main(int argc, char *argv[])
 }
 
 #include "main.moc"
+
