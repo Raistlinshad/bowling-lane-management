@@ -420,7 +420,7 @@ private:
     
         bottomBarLayout->addWidget(messageScrollArea, 1);     // Expandable message area
         bottomBarLayout->addSpacing(10);
-        bottomBarLayout->addWidget(pinDisplay);
+        // bottomBarLayout->addWidget(pinDisplay);
         bottomBarLayout->addWidget(laneStatusLabel);
     
         // Create a bottom bar widget that sits at the bottom of the game widget
@@ -1014,4 +1014,5 @@ int main(int argc, char *argv[])
 }
 
 #include "main.moc"
+
 
