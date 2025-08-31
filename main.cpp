@@ -520,24 +520,46 @@ private:
         qDebug() << "3-6-9 game initialized with" << targetFrames.size() << "target frames";
     }
     
-    void updateGameDisplay() {
-        if (!gameActive || !game) return;
-        
-        // Clear existing bowler widgets
-        QLayoutItem* item;
-        while ((item = gameWidgetLayout->takeAt(0)) != nullptr) {
-            delete item->widget();
-            delete item;
+void updateGameDisplay() {
+    if (!gameActive || !game) {
+        qDebug() << "Game not active or null, skipping display update";
+        return;
+    }
+    
+    // Clear existing bowler widgets
+    QLayoutItem* item;
+    while ((item = gameWidgetLayout->takeAt(0)) != nullptr) {
+        delete item->widget();
+        delete item;
+    }
+    
+    const QVector<Bowler>& bowlers = game->getBowlers();
+    int currentIdx = game->getCurrentBowlerIndex();
+    
+    // Create enhanced bowler widgets - CURRENT PLAYER FIRST
+    QVector<EnhancedBowlerWidget*> widgetOrder;
+    
+    // Add current player first
+    if (currentIdx >= 0 && currentIdx < bowlers.size()) {
+        QJsonObject displayOptions;
+        if (currentGameData.contains("display_options")) {
+            displayOptions = currentGameData["display_options"].toObject();
         }
         
-        const QVector<Bowler>& bowlers = game->getBowlers();
-        int currentIdx = game->getCurrentBowlerIndex();
+        // Add 3-6-9 status if active
+        if (threeSixNine->isActive()) {
+            displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[currentIdx].name);
+            displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[currentIdx].name);
+        }
         
-        // Create enhanced bowler widgets - CURRENT PLAYER FIRST
-        QVector<EnhancedBowlerWidget*> widgetOrder;
-        
-        // Add current player first
-        if (currentIdx >= 0 && currentIdx < bowlers.size()) {
+        EnhancedBowlerWidget* currentWidget = new EnhancedBowlerWidget(bowlers[currentIdx], true, displayOptions);
+        currentWidget->setStyleSheet("QFrame { border: 3px solid red; background-color: black; color: red; }");
+        widgetOrder.append(currentWidget);
+    }
+    
+    // Add other players
+    for (int i = 0; i < bowlers.size(); ++i) {
+        if (i != currentIdx) { // Skip current player as already added
             QJsonObject displayOptions;
             if (currentGameData.contains("display_options")) {
                 displayOptions = currentGameData["display_options"].toObject();
@@ -545,46 +567,90 @@ private:
             
             // Add 3-6-9 status if active
             if (threeSixNine->isActive()) {
-                displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[currentIdx].name);
-                displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[currentIdx].name);
+                displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[i].name);
+                displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[i].name);
             }
             
-            EnhancedBowlerWidget* currentWidget = new EnhancedBowlerWidget(bowlers[currentIdx], true, displayOptions);
-            currentWidget->setStyleSheet("QFrame { border: 3px solid red; background-color: black; color: red; }");
-            widgetOrder.append(currentWidget);
+            EnhancedBowlerWidget* otherWidget = new EnhancedBowlerWidget(bowlers[i], false, displayOptions);
+            otherWidget->setStyleSheet("QFrame { border: 1px solid lightblue; background-color: black; color: lightblue; }");
+            widgetOrder.append(otherWidget);
         }
-        
-        // Add other players
-        for (int i = 0; i < bowlers.size(); ++i) {
-            if (i != currentIdx) { // Skip current player as already added
-                QJsonObject displayOptions;
-                if (currentGameData.contains("display_options")) {
-                    displayOptions = currentGameData["display_options"].toObject();
-                }
+    }
+    
+    // Add widgets to layout in order
+    for (EnhancedBowlerWidget* widget : widgetOrder) {
+        gameWidgetLayout->addWidget(widget);
+    }
+    
+    gameWidgetLayout->addStretch();
+    
+    // FIXED: Safe pin display update with validation and error handling
+    if (pinDisplay) {
+        try {
+            QVector<int> pinStates;
+            
+            // Get pin states with safety checks
+            if (game) {
+                pinStates = game->getCurrentPinStates();
                 
-                // Add 3-6-9 status if active
-                if (threeSixNine->isActive()) {
-                    displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[i].name);
-                    displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[i].name);
+                // Validate the pin states before setting
+                if (pinStates.size() == 5) {
+                    // Validate each pin state value
+                    bool validStates = true;
+                    for (int i = 0; i < pinStates.size(); ++i) {
+                        if (pinStates[i] < 0 || pinStates[i] > 1) {
+                            qWarning() << "Invalid pin state at index" << i << "value:" << pinStates[i];
+                            validStates = false;
+                            break;
+                        }
+                    }
+                    
+                    if (validStates) {
+                        // Safe to set pin states
+                        pinDisplay->setPinStates(pinStates);
+                    } else {
+                        // Use default safe pin states
+                        qWarning() << "Using default pin states due to invalid values";
+                        QVector<int> defaultStates = {1, 1, 1, 1, 1}; // All pins up
+                        pinDisplay->setPinStates(defaultStates);
+                    }
+                } else {
+                    qWarning() << "Invalid pin states size:" << pinStates.size() << "expected 5";
+                    // Use default safe pin states
+                    QVector<int> defaultStates = {1, 1, 1, 1, 1}; // All pins up
+                    pinDisplay->setPinStates(defaultStates);
                 }
-                
-                EnhancedBowlerWidget* otherWidget = new EnhancedBowlerWidget(bowlers[i], false, displayOptions);
-                otherWidget->setStyleSheet("QFrame { border: 1px solid lightblue; background-color: black; color: lightblue; }");
-                widgetOrder.append(otherWidget);
+            } else {
+                qWarning() << "Game object is null, using default pin states";
+                QVector<int> defaultStates = {1, 1, 1, 1, 1}; // All pins up
+                pinDisplay->setPinStates(defaultStates);
+            }
+        } catch (const std::exception& e) {
+            qWarning() << "Exception in pin display update:" << e.what();
+            // Emergency fallback - reset pins to default state
+            QVector<int> safeStates = {1, 1, 1, 1, 1}; // All pins up
+            try {
+                pinDisplay->setPinStates(safeStates);
+            } catch (...) {
+                qWarning() << "Critical: Cannot update pin display, disabling for this session";
+                // Disable pin display updates for remainder of session
+                pinDisplay->setVisible(false);
+            }
+        } catch (...) {
+            qWarning() << "Unknown exception in pin display update";
+            // Emergency fallback
+            QVector<int> safeStates = {1, 1, 1, 1, 1}; // All pins up
+            try {
+                pinDisplay->setPinStates(safeStates);
+            } catch (...) {
+                qWarning() << "Critical: Cannot update pin display, disabling for this session";
+                pinDisplay->setVisible(false);
             }
         }
-        
-        // Add widgets to layout in order
-        for (EnhancedBowlerWidget* widget : widgetOrder) {
-            gameWidgetLayout->addWidget(widget);
-        }
-        
-        gameWidgetLayout->addStretch();
-        
-        // Update pin display
-        QVector<int> pinStates = game->getCurrentPinStates();
-        pinDisplay->setPinStates(pinStates);
+    } else {
+        qWarning() << "pinDisplay is null";
     }
+}
 
     void handleDisplayModeChange(const QJsonObject& data) {
         QString frameMode = data["frame_mode"].toString();
@@ -932,6 +998,12 @@ int main(int argc, char *argv[])
     app.setApplicationName("Canadian5PinBowling");
     app.setApplicationVersion("1.0");
     app.setOrganizationName("BowlingCenter");
+    
+    // Raspberry Pi 3 optimizations
+    QThreadPool::globalInstance()->setMaxThreadCount(2); // Limit to 2 threads
+    app.setAttribute(Qt::AA_DisableWindowContextHelpButton);
+    app.setQuitOnLastWindowClosed(true);
+    QPixmapCache::setCacheLimit(1024); // Reduce memory usage
     
     BowlingMainWindow window;
     window.show();
