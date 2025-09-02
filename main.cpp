@@ -735,7 +735,9 @@ private:
         // Process the ball through your game logic
         // You may need to modify QuickGame to accept this format
         if (game->respondsTo("processBallDetection")) {
-            game->processBallDetection(ballData);
+            if (game) {
+                game->processBallDetection(ballData);
+            }
         } else {
             // Fallback - process through existing method
             onBallProcessed(ballData);
