@@ -623,8 +623,6 @@ private:
                 totalValue += pinValues[i];
             }
         }
-        
-        qDebug() << "Ball detected - Pin states:" << pinStates << "Total value:" << totalValue;
     
         // Convert to the format expected by your game logic
         QJsonObject ballData;
@@ -675,7 +673,7 @@ private:
     }
 
     void onPinStatesChanged(const QVector<int>& states) {
-        qDebug() << "Pin states changed:" << states;
+        qDebug() << "Pin states changed"
     }
 
     void setupGame() {
@@ -970,7 +968,6 @@ private:
             currentBowler.name,
             currentBowler.currentFrame,
             currentFrame.balls.size(),
-            pinStates
         );
     }
 
