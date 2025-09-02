@@ -647,7 +647,9 @@ private:
         }
         
         gameWidgetLayout->addStretch();
+
         
+        /*
         // SINGLE pin display update section
         if (pinDisplay) {
             try {
@@ -684,6 +686,7 @@ private:
                 pinDisplay = nullptr;
             }
         }
+        */
     }
 
     // Machine interface slot implementations
