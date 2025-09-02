@@ -5,6 +5,12 @@
 #include <QJsonArray>
 #include <QRandomGenerator>
 
+// Add missing ADS I2C handles declaration
+#ifdef GPIO_AVAILABLE
+int MachineInterface::ads1_handle = -1;
+int MachineInterface::ads2_handle = -1;
+#endif
+
 // Constructor
 MachineInterface::MachineInterface(QObject* parent) 
     : QObject(parent)
@@ -245,7 +251,48 @@ void MachineInterface::checkBallSensor() {
         ballDetectionCounter = 0;
     }
 #else
-    qDebug() << "GPIO NOT AVAILABLE"
+    // Simulation mode - generate test ball detection
+    static int simCounter = 0;
+    simCounter++;
+    
+    if (simCounter > 3000) { // Every 3 seconds in simulation
+        simCounter = 0;
+        
+        // Generate realistic Canadian 5-pin results
+        QVector<int> simResults;
+        int scenario = QRandomGenerator::global()->bounded(0, 10);
+        
+        if (scenario == 0) {
+            // Strike - all pins down
+            simResults = {0, 0, 0, 0, 0};
+        } else if (scenario == 1) {
+            // Center pin only
+            simResults = {1, 1, 0, 1, 1};
+        } else if (scenario == 2) {
+            // Left side
+            simResults = {0, 0, 1, 1, 1};
+        } else if (scenario == 3) {
+            // Right side
+            simResults = {1, 1, 1, 0, 0};
+        } else if (scenario == 4) {
+            // Split - corners only
+            simResults = {0, 1, 1, 1, 0};
+        } else {
+            // Random combination
+            simResults = {1, 1, 1, 1, 1};
+            int pinsDown = QRandomGenerator::global()->bounded(1, 4);
+            for (int i = 0; i < pinsDown; ++i) {
+                int pin = QRandomGenerator::global()->bounded(0, 5);
+                simResults[pin] = 0;
+            }
+        }
+        
+        currentPinStates = simResults;
+        
+        qDebug() << "SIMULATED BALL DETECTED on lane" << laneId << "- Pin states:" << simResults;
+        emit ballDetected(simResults);
+        emit pinStatesChanged(simResults);
+    }
 #endif
 }
 
@@ -254,33 +301,166 @@ QVector<int> MachineInterface::readPinSensors() {
     QVector<int> pinStates = {1, 1, 1, 1, 1}; // Default: all pins up
     
 #ifdef GPIO_AVAILABLE
-    try {
-        // This is a simplified version - real implementation would:
-        // 1. Read voltage from each ADS1115 channel
-        // 2. Compare against 4V threshold
-        // 3. Map sensor channels to pin positions using pb10, pb11, etc.
-        
-        // For now, simulate sensor reading based on some logic
-        // In real implementation, you'd do something like:
-        /*
-        int b10_raw = wiringPiI2CReadReg16(ads1_handle, ADS1115_REG_CONVERSION);
-        float b10_voltage = (b10_raw / 32768.0) * 6.144; // Convert to voltage
-        if (b10_voltage >= 4.0) {
-            // Pin corresponding to pb10 is down
-            pinStates[pin_index] = 0;
+    const float VOLTAGE_THRESHOLD = 4.0f; // 4V threshold for pin down detection
+    const int MAX_RETRY_ATTEMPTS = 5;     // Maximum retry attempts per sensor
+    const int RETRY_DELAY_MS = 10;        // Delay between retries
+    const int CONVERSION_TIMEOUT_MS = 100; // Timeout for each conversion
+    
+    // Pin sensor mappings based on settings.json
+    struct PinSensor {
+        QString name;
+        int adsHandle;
+        int channel;
+        int pinIndex;  // Index in pinStates array
+    };
+    
+    // Map sensors to pins based on your settings
+    QVector<PinSensor> sensors = {
+        {pb10, ads1_handle, 0, getPinIndexFromName(pb10)},  // ADS1, Channel 0
+        {pb11, ads1_handle, 1, getPinIndexFromName(pb11)},  // ADS1, Channel 1  
+        {pb12, ads1_handle, 2, getPinIndexFromName(pb12)},  // ADS1, Channel 2
+        {pb13, ads1_handle, 3, getPinIndexFromName(pb13)},  // ADS1, Channel 3
+        {pb20, ads2_handle, 0, getPinIndexFromName(pb20)}   // ADS2, Channel 0
+    };
+    
+    qint64 startTime = QDateTime::currentMSecsSinceEpoch();
+    qint64 maxReadTime = 3000; // 3 second maximum for all sensors
+    
+    for (const PinSensor& sensor : sensors) {
+        if (sensor.pinIndex < 0 || sensor.pinIndex >= 5) {
+            qWarning() << "Invalid pin index for sensor" << sensor.name;
+            continue;
         }
-        */
         
-        // Placeholder - return current known states
-        pinStates = currentPinStates;
+        bool sensorReadSuccessfully = false;
+        int attempts = 0;
         
-    } catch (...) {
-        qWarning() << "Error reading pin sensors, using default states";
+        while (!sensorReadSuccessfully && 
+               attempts < MAX_RETRY_ATTEMPTS && 
+               (QDateTime::currentMSecsSinceEpoch() - startTime) < maxReadTime) {
+            
+            attempts++;
+            
+            try {
+                float voltage = readADS1115Channel(sensor.adsHandle, sensor.channel, CONVERSION_TIMEOUT_MS);
+                
+                if (voltage >= 0.0f) { // Valid reading
+                    if (voltage >= VOLTAGE_THRESHOLD) {
+                        pinStates[sensor.pinIndex] = 0; // Pin down
+                        qDebug() << "Sensor" << sensor.name << "voltage:" << voltage << "V (PIN DOWN)";
+                    } else {
+                        pinStates[sensor.pinIndex] = 1; // Pin up  
+                        qDebug() << "Sensor" << sensor.name << "voltage:" << voltage << "V (PIN UP)";
+                    }
+                    sensorReadSuccessfully = true;
+                } else {
+                    qWarning() << "Invalid reading from sensor" << sensor.name << "attempt" << attempts;
+                    if (attempts < MAX_RETRY_ATTEMPTS) {
+                        delay(RETRY_DELAY_MS); // Brief delay before retry
+                    }
+                }
+                
+            } catch (const std::exception& e) {
+                qWarning() << "Exception reading sensor" << sensor.name << "attempt" << attempts << ":" << e.what();
+                if (attempts < MAX_RETRY_ATTEMPTS) {
+                    delay(RETRY_DELAY_MS);
+                }
+            } catch (...) {
+                qWarning() << "Unknown error reading sensor" << sensor.name << "attempt" << attempts;
+                if (attempts < MAX_RETRY_ATTEMPTS) {
+                    delay(RETRY_DELAY_MS);
+                }
+            }
+        }
+        
+        if (!sensorReadSuccessfully) {
+            qCritical() << "FAILED to read sensor" << sensor.name << "after" << attempts << "attempts, using default PIN UP";
+            pinStates[sensor.pinIndex] = 1; // Default to pin up on failure
+        }
     }
+    
+    qDebug() << "Final pin states:" << pinStates;
+    
 #endif
     
     return pinStates;
 }
+
+#ifdef GPIO_AVAILABLE
+// Helper method to read from specific ADS1115 channel with timeout
+float MachineInterface::readADS1115Channel(int adsHandle, int channel, int timeoutMs) {
+    if (adsHandle < 0) {
+        throw std::runtime_error("Invalid ADS handle");
+    }
+    
+    // Configure ADS1115 for single-shot conversion on specified channel
+    uint16_t config = ADS1115_CONFIG_OS_SINGLE |      // Start conversion
+                     ADS1115_CONFIG_PGA_6_144V |       // +/-6.144V range  
+                     ADS1115_CONFIG_MODE_SINGLE |      // Single-shot mode
+                     ADS1115_CONFIG_DR_128SPS |        // 128 SPS
+                     ADS1115_CONFIG_CMODE_TRAD |       // Traditional comparator
+                     ADS1115_CONFIG_CPOL_ACTVLOW |     // Active low
+                     ADS1115_CONFIG_CLAT_NONLAT |      // Non-latching
+                     ADS1115_CONFIG_CQUE_NONE;         // Disable comparator
+    
+    // Set channel
+    switch (channel) {
+        case 0: config |= ADS1115_CONFIG_MUX_AIN0; break;
+        case 1: config |= ADS1115_CONFIG_MUX_AIN1; break;
+        case 2: config |= ADS1115_CONFIG_MUX_AIN2; break;
+        case 3: config |= ADS1115_CONFIG_MUX_AIN3; break;
+        default: 
+            throw std::runtime_error("Invalid ADS1115 channel: " + std::to_string(channel));
+    }
+    
+    // Write configuration to start conversion
+    if (wiringPiI2CWriteReg16(adsHandle, ADS1115_REG_CONFIG, config) < 0) {
+        throw std::runtime_error("Failed to write ADS1115 config");
+    }
+    
+    // Wait for conversion to complete
+    qint64 startTime = QDateTime::currentMSecsSinceEpoch();
+    
+    while ((QDateTime::currentMSecsSinceEpoch() - startTime) < timeoutMs) {
+        // Check if conversion is complete (OS bit = 1)
+        int configRead = wiringPiI2CReadReg16(adsHandle, ADS1115_REG_CONFIG);
+        if (configRead < 0) {
+            throw std::runtime_error("Failed to read ADS1115 config status");
+        }
+        
+        if (configRead & ADS1115_CONFIG_OS_SINGLE) {
+            // Conversion complete, read result
+            int raw = wiringPiI2CReadReg16(adsHandle, ADS1115_REG_CONVERSION);
+            if (raw < 0) {
+                throw std::runtime_error("Failed to read ADS1115 conversion result");
+            }
+            
+            // Convert raw reading to voltage
+            // ADS1115 returns 16-bit signed value, +/-6.144V range
+            float voltage = ((int16_t)raw / 32768.0f) * 6.144f;
+            
+            return voltage;
+        }
+        
+        delay(1); // Small delay before checking again
+    }
+    
+    throw std::runtime_error("ADS1115 conversion timeout");
+}
+
+// Helper method to map pin names to array indices
+int MachineInterface::getPinIndexFromName(const QString& pinName) {
+    // Map pin sensor names to pin positions in [lTwo, lThree, cFive, rThree, rTwo]
+    if (pinName == "lTwo") return 0;
+    if (pinName == "lThree") return 1; 
+    if (pinName == "cFive") return 2;
+    if (pinName == "rThree") return 3;
+    if (pinName == "rTwo") return 4;
+    
+    qWarning() << "Unknown pin name:" << pinName;
+    return -1; // Invalid index
+}
+#endif
 
 // Machine timer callback
 void MachineInterface::onMachineTimer() {

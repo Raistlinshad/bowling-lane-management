@@ -5,7 +5,6 @@
 #include <QVector>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QProcess>
 #include <QTimer>
 #include <QDebug>
 
@@ -13,7 +12,7 @@
 class Ball;
 class Frame;
 class Bowler;
-class MachineInterface;
+// REMOVED: MachineInterface forward declaration (now handled by main window)
 
 // Ball class representing a single throw
 class Ball {
@@ -69,7 +68,7 @@ public:
     const Frame& getCurrentFrame() const;
 
     bool operator==(const Bowler& other) const {
-    return name == other.name;
+        return name == other.name;
     }
     
     // Game state methods
@@ -79,45 +78,10 @@ public:
     // Serialization
     QJsonObject toJson() const;
     void fromJson(const QJsonObject& json);
-
 };
 
-// Machine interface for communicating with Python ball detector
-class MachineInterface : public QObject {
-    Q_OBJECT
-    
-public:
-    explicit MachineInterface(QObject* parent = nullptr);
-    ~MachineInterface();
-    
-    void startDetection();
-    void stopDetection();
-    
-    bool isRunning() const;
-    void sendCommand(const QString& command, const QJsonObject& data = QJsonObject());
-    void machineReset();
-
-signals:
-    void ballDetected(const QVector<int>& pins);
-    void machineError(const QString& error);
-    void machineReady();
-    void machineStatusChanged(const QString& status);
-
-private slots:
-    void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void onDataReady();
-    void onErrorOccurred(QProcess::ProcessError error);
-
-private:
-    static bool s_interfaceStarted;
-    void setupProcess();
-    void processMachineOutput(const QString& line);
-    
-    QProcess* pythonProcess;
-    QTimer* heartbeatTimer;
-    bool machineIsReady;
-    QString lastError;
-};
+// REMOVED: Old Python-based MachineInterface class definition
+// Machine interface is now handled by main window with separate MachineInterface.h/.cpp
 
 // Main Quick Game class
 class QuickGame : public QObject {
@@ -135,20 +99,18 @@ public:
     // Player management
     void addPlayer(const QString& playerName);
     void removePlayer(const QString& playerName);
-    void movePlayerToPosition(int from, int to);
     
     // Game flow control
     void processBall(const QVector<int>& pins);
+    void processBallDetection(const QJsonObject& ballData);  // NEW: For main window integration
     void holdGame();
     void skipPlayer();
-    void skipFrame();
 
     static const QVector<int> PIN_VALUES;  // {2, 3, 5, 3, 2}
     
     // Score management
     void updateScore(const QJsonObject& scoreData);
     void recalculateScores();
-    void sendMachineCommand(const QString& command, const QJsonObject& data = QJsonObject());
     
     // Game state queries
     const QVector<Bowler>& getBowlers() const { return bowlers; }
@@ -175,6 +137,9 @@ public:
     
     // Statistics
     QJsonObject getGameStatistics() const;
+    
+    // DEPRECATED: Machine interface methods (kept for compatibility but do nothing)
+    void sendMachineCommand(const QString& command, const QJsonObject& data = QJsonObject());
 
 signals:
     void gameStarted();
@@ -196,10 +161,12 @@ signals:
     void errorOccurred(const QString& error);
 
 private slots:
+    void onGameTimer();
+    
+    // DEPRECATED: Machine-related slots (kept for compatibility but do nothing)
     void onBallDetected(const QVector<int>& pins);
     void onMachineError(const QString& error);
     void onMachineReady();
-    void onGameTimer();
 
 private:
     // Game logic
@@ -218,7 +185,7 @@ private:
     void triggerSpecialEffect(const QString& effect, const QJsonObject& data = QJsonObject());
     void checkForSpecialEvents(const Ball& ball, const Frame& frame);
     
-    // Machine communication
+    // DEPRECATED: Machine communication (removed, handled by main window)
     void startMachineInterface();
     void stopMachineInterface();
     
@@ -243,19 +210,15 @@ private:
     QTimer* gameTimer;
     qint64 gameStartTime;
     
-    // Machine interface
-    MachineInterface* machine;
-    
-    // Special conditions tracking
-    QVector<QString> activeEffects;
+    // REMOVED: Machine interface (now handled by main window)
+    // MachineInterface* machine; - REMOVED
+    void* machine;  // Placeholder to prevent compilation errors
     
     // Constants
     static const int MAX_PLAYERS = 6;
     static const int FRAMES_PER_GAME = 10;
     static const int MAX_BALLS_PER_FRAME = 3;
     static const int PERFECT_SCORE = 450;  // 15 * 30 (10 strikes + 20 bonus balls)
-    
-    // Canadian 5-pin specific constants
     static const int TOTAL_PIN_VALUE = 15;
     static const int STRIKE_VALUE = 15;
     static const int SPARE_VALUE = 15;
