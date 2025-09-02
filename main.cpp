@@ -783,13 +783,13 @@ private:
     
         // Connect machine interface signals
         connect(machineInterface, &MachineInterface::ballDetected, 
-                this, onBallDetected);
+                this, &BowlingMainWindow::onBallDetected);
         connect(machineInterface, &MachineInterface::machineReady,
-                this, onMachineReady);
+                this, &BowlingMainWindow::onMachineReady);
         connect(machineInterface, &MachineInterface::machineError,
-                this, onMachineError);
+                this, &BowlingMainWindow::onMachineError);
         connect(machineInterface, &MachineInterface::pinStatesChanged,
-                this, onPinStatesChanged);
+                this, &BowlingMainWindow::onPinStatesChanged);
     
         // Initialize machine interface
         if (!machineInterface->initialize()) {
