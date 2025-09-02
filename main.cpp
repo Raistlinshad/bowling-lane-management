@@ -36,7 +36,7 @@
 #include "ThreeSixNineTracker.h"
 #include "GameStatistics.h"
 #include "GameRecoveryManager.h"
-
+#include "MachineInterface.h"  // Add this include
 
 // Main bowling window class
 class BowlingMainWindow : public QMainWindow {
@@ -45,7 +45,7 @@ class BowlingMainWindow : public QMainWindow {
 public:
     BowlingMainWindow(QWidget* parent = nullptr) : QMainWindow(parent), 
         gameActive(false), currentGameNumber(1), gameOver(false), isCallMode(false),
-        framesSinceFirstBall(0), flashing(false) {
+        framesSinceFirstBall(0), flashing(false), machineInterface(nullptr) {  // Initialize to nullptr
         
         // Initialize systems
         gameRecovery = new GameRecoveryManager(this);
@@ -91,7 +91,20 @@ public:
         });
     }
 
+    ~BowlingMainWindow() {
+        if (machineInterface) {
+            machineInterface->shutdown();
+            delete machineInterface;
+            machineInterface = nullptr;
+        }
+    }
+
 private slots:
+    void onBallDetected(const QVector<int>& pinStates);  // Fixed signature - remove totalValue
+    void onMachineReady();
+    void onMachineError(const QString& error);
+    void onPinStatesChanged(const QVector<int>& states);
+
     void onGameUpdated() {
         updateGameDisplay();
         updateGameStatus();
@@ -126,6 +139,11 @@ private slots:
         applyGameColors();
         updateButtonStates();
         
+        // Start machine interface ball detection
+        if (machineInterface) {
+            machineInterface->startBallDetection();
+        }
+        
         // Initialize 3-6-9 if enabled in game data
         if (currentGameData.contains("display_options")) {
             QJsonObject displayOpts = currentGameData["display_options"].toObject();
@@ -141,6 +159,11 @@ private slots:
     
     void onGameEnded(const QJsonObject& results) {
         qDebug() << "=== GAME ENDED ===";
+        
+        // Stop machine interface
+        if (machineInterface) {
+            machineInterface->stopBallDetection();
+        }
         
         // Record statistics
         if (game) {
@@ -334,26 +357,17 @@ private slots:
     }
 
     void onResetClicked() {
-        if (!game || !gameActive || gameOver) return;
-        
-        // Send machine reset/set command instead of resetting game
-        QJsonObject resetData;
-        resetData["immediate"] = true;
+        if (!game || !gameActive || gameOver || !machineInterface) return;
         
         if (framesSinceFirstBall == 0) {
             // First ball - full reset
-            resetData["reset_type"] = "FULL_RESET";
-            game->sendMachineCommand("machine_reset", resetData);
+            machineInterface->resetPins(true);
+            messageScrollArea->setText("Resetting all pins...");
         } else {
-            // After first ball - set pins to current state
-            resetData["reset_type"] = "SET_PINS";
-            QVector<int> currentPins = game->getCurrentPinStates();
-            QJsonArray pinsArray;
-            for (int pin : currentPins) {
-                pinsArray.append(pin);
-            }
-            resetData["pin_states"] = pinsArray;
-            game->sendMachineCommand("machine_set_pins", resetData);
+            // After first ball - set pins to current detected state
+            QVector<int> currentPins = machineInterface->getCurrentPinStates();
+            machineInterface->setPinConfiguration(currentPins);
+            messageScrollArea->setText("Setting pins to current position...");
         }
     }
 
@@ -363,27 +377,27 @@ private slots:
     }
 
 private:
-    void setupGameInterface() {
+    void setupGameInterface() {  // Fixed - no scope issue, no extra variable
         QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
-        gameLayout->setContentsMargins(0, 0, 0, 0); // Remove all margins
-        gameLayout->setSpacing(0); // Remove spacing
+        gameLayout->setContentsMargins(0, 0, 0, 0);
+        gameLayout->setSpacing(0);
     
-        // MAIN GAME AREA - Set to fill entire available space
+        // MAIN GAME AREA
         gameDisplayArea = new QScrollArea(this);
         gameDisplayArea->setWidgetResizable(true);
         gameDisplayArea->setStyleSheet("QScrollArea { border: none; background-color: #2b2b2b; }");
     
         gameWidget = new QWidget();
         gameWidgetLayout = new QVBoxLayout(gameWidget);
-        gameWidgetLayout->setContentsMargins(10, 0, 10, 50); // Bottom margin for button space
+        gameWidgetLayout->setContentsMargins(10, 0, 10, 50);
         gameDisplayArea->setWidget(gameWidget);
     
-        // BOTTOM CONTROL BAR - Add directly to gameWidget layout, not separate widget
+        // BOTTOM CONTROL BAR
         QHBoxLayout* bottomBarLayout = new QHBoxLayout();
         bottomBarLayout->setSpacing(10);
         bottomBarLayout->setContentsMargins(10, 5, 10, 5);
     
-        // Left: Control Buttons
+        // Control Buttons
         holdButton = new QPushButton("HOLD", this);
         skipButton = new QPushButton("SKIP", this);
         resetButton = new QPushButton("RESET", this);
@@ -399,53 +413,80 @@ private:
         bottomBarLayout->addWidget(holdButton);
         bottomBarLayout->addWidget(skipButton);
         bottomBarLayout->addWidget(resetButton);
-        bottomBarLayout->addSpacing(20); // Space between buttons and message area
+        bottomBarLayout->addSpacing(20);
     
-        // Center: Scrolling Message Area
+        // Scrolling Message Area
         messageScrollArea = new ScrollTextWidget(this);
         messageScrollArea->setText("Welcome to Canadian 5-Pin Bowling");
         messageScrollArea->setFixedHeight(40);
         messageScrollArea->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 14px; border: 1px solid #555555; }");
     
-        // Right: Pin Display
-        // pinDisplay = new PinDisplayWidget(this);
-        // pinDisplay->setDisplayMode("small");
-        // pinDisplay->setFixedSize(120, 40);
-
-                
-        // Far Right: Lane Status for call mode
+        // Lane Status for call mode
         laneStatusLabel = new QLabel(QString("Lane %1").arg(1), this);
         laneStatusLabel->setFixedSize(80, 40);
         laneStatusLabel->setAlignment(Qt::AlignCenter);
         laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
     
-        bottomBarLayout->addWidget(messageScrollArea, 1);     // Expandable message area
+        bottomBarLayout->addWidget(messageScrollArea, 1);
         bottomBarLayout->addSpacing(10);
-        // bottomBarLayout->addWidget(pinDisplay);
+    
+        // Pin Display with error handling
+        try {
+            pinDisplay = new PinDisplayWidget(this);
+            pinDisplay->setDisplayMode("small");
+            pinDisplay->setFixedSize(120, 40);
+        
+            // Set default safe state
+            QVector<int> defaultStates = {1, 1, 1, 1, 1};
+            pinDisplay->setPinStates(defaultStates);
+        
+            bottomBarLayout->addWidget(pinDisplay);
+            qDebug() << "Pin display initialized successfully";
+        
+        } catch (const std::exception& e) {
+            qWarning() << "Failed to initialize pin display:" << e.what();
+            pinDisplay = nullptr;
+        
+            // Create placeholder label instead
+            QLabel* pinPlaceholder = new QLabel("PIN", this);
+            pinPlaceholder->setFixedSize(120, 40);
+            pinPlaceholder->setAlignment(Qt::AlignCenter);
+            pinPlaceholder->setStyleSheet("QLabel { background-color: #333; color: white; border: 1px solid #666; }");
+            bottomBarLayout->addWidget(pinPlaceholder);
+        
+        } catch (...) {
+            qWarning() << "Unknown error initializing pin display";
+            pinDisplay = nullptr;
+        
+            // Create placeholder
+            QLabel* pinPlaceholder = new QLabel("PIN", this);
+            pinPlaceholder->setFixedSize(120, 40);
+            pinPlaceholder->setAlignment(Qt::AlignCenter);
+            pinPlaceholder->setStyleSheet("QLabel { background-color: #333; color: white; border: 1px solid #666; }");
+            bottomBarLayout->addWidget(pinPlaceholder);
+        }
+    
         bottomBarLayout->addWidget(laneStatusLabel);
     
-        // Create a bottom bar widget that sits at the bottom of the game widget
+        // Create bottom bar container
         QWidget* bottomBarContainer = new QWidget();
         bottomBarContainer->setFixedHeight(50);
         bottomBarContainer->setStyleSheet("QWidget { background-color: black; }");
         bottomBarContainer->setLayout(bottomBarLayout);
         
-        // Add bottom bar to the game widget layout (so it appears inside the scroll area at the bottom)
-        gameWidgetLayout->addStretch(); // Push everything up
-        gameWidgetLayout->addWidget(bottomBarContainer); // Add bottom bar at the end
+        gameWidgetLayout->addStretch();
+        gameWidgetLayout->addWidget(bottomBarContainer);
     
-        // Assemble main layout - only the scroll area, no separate bottom widget
-        gameLayout->addWidget(gameDisplayArea, 1);    // Takes entire space
+        gameLayout->addWidget(gameDisplayArea, 1);
     }
     
     void updateButtonStates() {
-        // Safety check - ensure buttons exist before accessing them
+        // ... existing updateButtonStates code unchanged ...
         if (!holdButton || !skipButton || !resetButton) {
             qWarning() << "Button pointers are null in updateButtonStates()";
             return;
         }
     
-        // Additional safety - check if buttons are valid QObject instances
         if (holdButton->isWidgetType() == false || 
             skipButton->isWidgetType() == false || 
             resetButton->isWidgetType() == false) {
@@ -454,7 +495,6 @@ private:
         }
     
         if (!gameActive || gameOver) {
-            // Game over state - only CALL button active
             try {
                 holdButton->setText("CALL");
                 holdButton->setEnabled(true);
@@ -473,7 +513,6 @@ private:
         }
     
         try {
-            // Normal game state
             if (isCallMode) {
                 holdButton->setText("CALL");
                 holdButton->setStyleSheet("QPushButton { background-color: red; color: white; font-size: 14px; font-weight: bold; }");
@@ -485,7 +524,6 @@ private:
                 holdButton->setStyleSheet("QPushButton { background-color: blue; color: white; font-size: 14px; font-weight: bold; }");
             }
         
-            // Reset button logic: RESET for first ball, SET after first ball
             if (framesSinceFirstBall == 0) {
                 resetButton->setText("RESET");
             } else {
@@ -494,7 +532,6 @@ private:
             resetButton->setEnabled(true);
             resetButton->setStyleSheet("QPushButton { background-color: darkred; color: white; font-size: 14px; font-weight: bold; }");
         
-            // Skip button
             skipButton->setEnabled(true);
             skipButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
         
@@ -505,7 +542,6 @@ private:
         }
     }
 
-    
     void handleCloseGame() {
         qDebug() << "Received close game command";
         
@@ -519,7 +555,6 @@ private:
         hideGameInterface();
         mediaDisplay->showMediaRotation();
         
-        // Reset lane status
         if (laneStatusLabel) {
             laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
         }
@@ -533,7 +568,6 @@ private:
             bowlerNames.append(bowler.name);
         }
         
-        // Parse target frames from config
         QJsonArray framesArray = config["frames"].toArray();
         QVector<int> targetFrames;
         for (const QJsonValue& value : framesArray) {
@@ -549,46 +583,27 @@ private:
         qDebug() << "3-6-9 game initialized with" << targetFrames.size() << "target frames";
     }
     
-void updateGameDisplay() {
-    if (!gameActive || !game) {
-        qDebug() << "Game not active or null, skipping display update";
-        return;
-    }
-    
-    // Clear existing bowler widgets
-    QLayoutItem* item;
-    while ((item = gameWidgetLayout->takeAt(0)) != nullptr) {
-        delete item->widget();
-        delete item;
-    }
-    
-    const QVector<Bowler>& bowlers = game->getBowlers();
-    int currentIdx = game->getCurrentBowlerIndex();
-    
-    // Create enhanced bowler widgets - CURRENT PLAYER FIRST
-    QVector<EnhancedBowlerWidget*> widgetOrder;
-    
-    // Add current player first
-    if (currentIdx >= 0 && currentIdx < bowlers.size()) {
-        QJsonObject displayOptions;
-        if (currentGameData.contains("display_options")) {
-            displayOptions = currentGameData["display_options"].toObject();
+    void BowlingMainWindow::updateGameDisplay() {
+        if (!gameActive || !game) {
+            qDebug() << "Game not active or null, skipping display update";
+            return;
         }
         
-        // Add 3-6-9 status if active
-        if (threeSixNine->isActive()) {
-            displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[currentIdx].name);
-            displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[currentIdx].name);
+        // Clear existing bowler widgets
+        QLayoutItem* item;
+        while ((item = gameWidgetLayout->takeAt(0)) != nullptr) {
+            delete item->widget();
+            delete item;
         }
         
-        EnhancedBowlerWidget* currentWidget = new EnhancedBowlerWidget(bowlers[currentIdx], true, displayOptions);
-        currentWidget->setStyleSheet("QFrame { border: 3px solid red; background-color: black; color: red; }");
-        widgetOrder.append(currentWidget);
-    }
-    
-    // Add other players
-    for (int i = 0; i < bowlers.size(); ++i) {
-        if (i != currentIdx) { // Skip current player as already added
+        const QVector<Bowler>& bowlers = game->getBowlers();
+        int currentIdx = game->getCurrentBowlerIndex();
+        
+        // Create enhanced bowler widgets - CURRENT PLAYER FIRST
+        QVector<EnhancedBowlerWidget*> widgetOrder;
+        
+        // Add current player first
+        if (currentIdx >= 0 && currentIdx < bowlers.size()) {
             QJsonObject displayOptions;
             if (currentGameData.contains("display_options")) {
                 displayOptions = currentGameData["display_options"].toObject();
@@ -596,111 +611,231 @@ void updateGameDisplay() {
             
             // Add 3-6-9 status if active
             if (threeSixNine->isActive()) {
-                displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[i].name);
-                displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[i].name);
+                displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[currentIdx].name);
+                displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[currentIdx].name);
             }
             
-            EnhancedBowlerWidget* otherWidget = new EnhancedBowlerWidget(bowlers[i], false, displayOptions);
-            otherWidget->setStyleSheet("QFrame { border: 1px solid lightblue; background-color: black; color: lightblue; }");
-            widgetOrder.append(otherWidget);
+            EnhancedBowlerWidget* currentWidget = new EnhancedBowlerWidget(bowlers[currentIdx], true, displayOptions);
+            currentWidget->setStyleSheet("QFrame { border: 3px solid red; background-color: black; color: red; }");
+            widgetOrder.append(currentWidget);
         }
-    }
-    
-    // Add widgets to layout in order
-    for (EnhancedBowlerWidget* widget : widgetOrder) {
-        gameWidgetLayout->addWidget(widget);
-    }
-    
-    gameWidgetLayout->addStretch();
-    
-    // FIXED: Safe pin display update with validation and error handling
-
-    if (pinDisplay) {
-        try {
-            QVector<int> pinStates;
-            
-            // Get pin states with safety checks
-            if (game) {
-                pinStates = game->getCurrentPinStates();
+        
+        // Add other players
+        for (int i = 0; i < bowlers.size(); ++i) {
+            if (i != currentIdx) {
+                QJsonObject displayOptions;
+                if (currentGameData.contains("display_options")) {
+                    displayOptions = currentGameData["display_options"].toObject();
+                }
                 
-                // Validate the pin states before setting
-                if (pinStates.size() == 5) {
-                    // Validate each pin state value
-                    bool validStates = true;
+                // Add 3-6-9 status if active
+                if (threeSixNine->isActive()) {
+                    displayOptions["three_six_nine_status"] = threeSixNine->getStatusText(bowlers[i].name);
+                    displayOptions["three_six_nine_dots"] = threeSixNine->getDotsCount(bowlers[i].name);
+                }
+                
+                EnhancedBowlerWidget* otherWidget = new EnhancedBowlerWidget(bowlers[i], false, displayOptions);
+                otherWidget->setStyleSheet("QFrame { border: 1px solid lightblue; background-color: black; color: lightblue; }");
+                widgetOrder.append(otherWidget);
+            }
+        }
+        
+        // Add widgets to layout in order
+        for (EnhancedBowlerWidget* widget : widgetOrder) {
+            gameWidgetLayout->addWidget(widget);
+        }
+        
+        gameWidgetLayout->addStretch();
+        
+        // SINGLE pin display update section
+        if (pinDisplay && pinDisplay->isVisible()) {
+            try {
+                QVector<int> pinStates;
+            
+                if (game) {
+                    pinStates = game->getCurrentPinStates();
+                
+                    if (pinStates.size() != 5) {
+                        qWarning() << "Invalid pin states size:" << pinStates.size() << "expected 5";
+                        pinStates = {1, 1, 1, 1, 1};
+                    }
+                
                     for (int i = 0; i < pinStates.size(); ++i) {
                         if (pinStates[i] < 0 || pinStates[i] > 1) {
                             qWarning() << "Invalid pin state at index" << i << "value:" << pinStates[i];
-                            validStates = false;
-                            break;
+                            pinStates[i] = 1;
                         }
                     }
-                    
-                    if (validStates) {
-                        // Safe to set pin states
-                        pinDisplay->setPinStates(pinStates);
-                    } else {
-                        // Use default safe pin states
-                        qWarning() << "Using default pin states due to invalid values";
-                        QVector<int> defaultStates = {1, 1, 1, 1, 1}; // All pins up
-                        pinDisplay->setPinStates(defaultStates);
-                    }
                 } else {
-                    qWarning() << "Invalid pin states size:" << pinStates.size() << "expected 5";
-                    // Use default safe pin states
-                    QVector<int> defaultStates = {1, 1, 1, 1, 1}; // All pins up
-                    pinDisplay->setPinStates(defaultStates);
+                    pinStates = {1, 1, 1, 1, 1};
                 }
-            } else {
-                qWarning() << "Game object is null, using default pin states";
-                QVector<int> defaultStates = {1, 1, 1, 1, 1}; // All pins up
-                pinDisplay->setPinStates(defaultStates);
-            }
-        } catch (const std::exception& e) {
-            qWarning() << "Exception in pin display update:" << e.what();
-            // Emergency fallback - reset pins to default state
-            QVector<int> safeStates = {1, 1, 1, 1, 1}; // All pins up
-            try {
-                pinDisplay->setPinStates(safeStates);
-            } catch (...) {
-                qWarning() << "Critical: Cannot update pin display, disabling for this session";
-                // Disable pin display updates for remainder of session
+            
+                QVector<int> safePinStates = pinStates;
+                pinDisplay->setPinStates(safePinStates);
+            
+            } catch (const std::exception& e) {
+                qCritical() << "Exception in pin display update:" << e.what();
                 pinDisplay->setVisible(false);
-            }
-        } catch (...) {
-            qWarning() << "Unknown exception in pin display update";
-            // Emergency fallback
-            QVector<int> safeStates = {1, 1, 1, 1, 1}; // All pins up
-            try {
-                pinDisplay->setPinStates(safeStates);
+                pinDisplay = nullptr;
             } catch (...) {
-                qWarning() << "Critical: Cannot update pin display, disabling for this session";
+                qCritical() << "Unknown exception in pin display update";
                 pinDisplay->setVisible(false);
+                pinDisplay = nullptr;
             }
         }
-    } else {
-        qWarning() << "pinDisplay is null";
     }
-}
 
-    void handleDisplayModeChange(const QJsonObject& data) {
+    // ... rest of the methods with proper scope qualifiers ...
+    void handleDisplayModeChange(const QJsonObject& data);
+    void handleTeamMove(const QJsonObject& data);
+    void handleScrollMessage(const QJsonObject& data);
+    void handleThreeSixNineToggle(const QJsonObject& data);
+    void setupUI();
+    void showGameInterface();
+    void hideGameInterface();
+    void setupClient();
+    void setupGame();
+    void applyDarkTheme();
+    void loadGameColors();
+    void applyGameColors();
+    void sendGameStatus();
+    void updateGameStatus();
+
+    // Machine interface slot implementations
+    void BowlingMainWindow::onBallDetected(const QVector<int>& pinStates) {
+        if (!gameActive || !game || gameOver) {
+            qDebug() << "Ball detected but game not active, ignoring";
+            return;
+        }
+    
+        // Calculate Canadian 5-pin value
+        QVector<int> pinValues = {2, 3, 5, 3, 2};
+        int totalValue = 0;
+        for (int i = 0; i < 5 && i < pinStates.size(); ++i) {
+            if (pinStates[i] == 0) { // Pin is down
+                totalValue += pinValues[i];
+            }
+        }
+        
+        qDebug() << "Ball detected - Pin states:" << pinStates << "Total value:" << totalValue;
+    
+        // Convert to the format expected by your game logic
+        QJsonObject ballData;
+        ballData["pins"] = QJsonArray::fromVariantList(QVariantList(pinStates.begin(), pinStates.end()));
+        ballData["value"] = totalValue;
+        ballData["timestamp"] = QDateTime::currentSecsSinceEpoch();
+    
+        // Determine if strike or spare
+        bool isStrike = (totalValue == 15);
+        if (isStrike) {
+            ballData["is_strike"] = true;
+            onSpecialEffect("strike");
+        }
+    
+        // Process the ball through your game logic
+        // You may need to modify QuickGame to accept this format
+        if (game->respondsTo("processBallDetection")) {
+            game->processBallDetection(ballData);
+        } else {
+            // Fallback - process through existing method
+            onBallProcessed(ballData);
+        }
+    
+        // Update display
+        updateGameDisplay();
+        updateButtonStates();
+    }
+
+    void BowlingMainWindow::onMachineReady() {
+        qDebug() << "Machine interface ready";
+        
+        // Start ball detection when machine is ready and game is active
+        if (gameActive && machineInterface) {
+            machineInterface->startBallDetection();
+        }
+    }
+
+    void BowlingMainWindow::onMachineError(const QString& error) {
+        qWarning() << "Machine error:" << error;
+        
+        // Show error message
+        if (messageScrollArea) {
+            messageScrollArea->setText("Machine Error: " + error);
+            messageScrollArea->startScrolling();
+        }
+    }
+
+    void BowlingMainWindow::onPinStatesChanged(const QVector<int>& states) {
+        qDebug() << "Pin states changed:" << states;
+        
+        // Update pin display if it exists
+        if (pinDisplay) {
+            try {
+                pinDisplay->setPinStates(states);
+            } catch (...) {
+                qWarning() << "Error updating pin display";
+            }
+        }
+    }
+
+    void BowlingMainWindow::setupGame() {
+        qDebug() << "=== SETTING UP GAME ===";
+
+        game = new QuickGame(this);
+        qDebug() << "Created QuickGame instance";
+
+        // Connect existing game signals
+        connect(game, &QuickGame::gameUpdated, this, &BowlingMainWindow::onGameUpdated);
+        connect(game, &QuickGame::specialEffect, this, &BowlingMainWindow::onSpecialEffect);
+        connect(game, &QuickGame::currentPlayerChanged, this, &BowlingMainWindow::onCurrentPlayerChanged);
+        connect(game, &QuickGame::gameStarted, this, &BowlingMainWindow::onGameStarted);
+        connect(game, &QuickGame::gameEnded, this, &BowlingMainWindow::onGameEnded);
+        connect(game, &QuickGame::ballProcessed, this, &BowlingMainWindow::onBallProcessed);
+        connect(game, &QuickGame::gameHeld, this, [this](bool held) {
+            qDebug() << "Game hold state changed to:" << held;
+            updateButtonStates();
+        });
+
+        // Initialize machine interface instead of Python process
+        machineInterface = new MachineInterface(this);
+    
+        // Connect machine interface signals
+        connect(machineInterface, &MachineInterface::ballDetected, 
+                this, &BowlingMainWindow::onBallDetected);
+        connect(machineInterface, &MachineInterface::machineReady,
+                this, &BowlingMainWindow::onMachineReady);
+        connect(machineInterface, &MachineInterface::machineError,
+                this, &BowlingMainWindow::onMachineError);
+        connect(machineInterface, &MachineInterface::pinStatesChanged,
+                this, &BowlingMainWindow::onPinStatesChanged);
+    
+        // Initialize machine interface
+        if (!machineInterface->initialize()) {
+            qCritical() << "Failed to initialize machine interface!";
+            // Handle error - maybe show error dialog or disable ball detection
+        }
+
+        qDebug() << "=== GAME SETUP COMPLETE ===";
+    }
+
+    // Add the remaining method implementations
+    void BowlingMainWindow::handleDisplayModeChange(const QJsonObject& data) {
         QString frameMode = data["frame_mode"].toString();
         int frameStart = data["frame_start"].toInt();
         
-        // Update display options and refresh
         currentGameData["display_options"] = data;
         updateGameDisplay();
         
         qDebug() << "Display mode changed to:" << frameMode << "starting at frame" << frameStart;
     }
     
-    void handleTeamMove(const QJsonObject& data) {
+    void BowlingMainWindow::handleTeamMove(const QJsonObject& data) {
         if (!gameActive) return;
         
         QString targetLane = data["target_lane"].toString();
         messageScrollArea->setText(QString("Team moving to Lane %1...").arg(targetLane));
         messageScrollArea->startScrolling();
         
-        // Send current game state to target lane
         QJsonObject gameState = game->getGameState();
         QJsonObject moveMessage;
         moveMessage["type"] = "team_move_data";
@@ -710,78 +845,64 @@ void updateGameDisplay() {
         
         client->sendMessage(moveMessage);
         
-        // Hide game interface and show waiting screen
         gameInterfaceWidget->hide();
         messageScrollArea->setText("Waiting for other team...");
         
         qDebug() << "Team move initiated to lane" << targetLane;
     }
     
-    void handleScrollMessage(const QJsonObject& data) {
+    void BowlingMainWindow::handleScrollMessage(const QJsonObject& data) {
         QString text = data["text"].toString();
-        int duration = 10000; // default
-        if (data.contains("duration")) {
-            duration = data["duration"].toInt();
-        }
+        int duration = data.value("duration", 10000).toInt();
         
         messageScrollArea->setText(text);
         messageScrollArea->startScrolling();
         
-        // Auto-clear after duration
         QTimer::singleShot(duration, this, [this]() {
             messageScrollArea->setText("Welcome to Canadian 5-Pin Bowling");
         });
     }
     
-    void handleThreeSixNineToggle(const QJsonObject& data) {
+    void BowlingMainWindow::handleThreeSixNineToggle(const QJsonObject& data) {
         if (!threeSixNine->canToggleParticipation()) return;
         
         QString bowlerName = data["bowler"].toString();
         bool participating = data["participating"].toBool();
         
         threeSixNine->setBowlerParticipation(bowlerName, participating);
-        updateGameDisplay(); // Refresh to show updated status
+        updateGameDisplay();
     }
 
-    void setupUI() {
+    void BowlingMainWindow::setupUI() {
         setWindowTitle("Canadian 5-Pin Bowling");
         setMinimumSize(1200, 800);
         
         QWidget* centralWidget = new QWidget(this);
         setCentralWidget(centralWidget);
         
-        // Create main layout with no margins or spacing
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
         mainLayout->setContentsMargins(0, 0, 0, 0);
         mainLayout->setSpacing(0);
         
-        // Media display area (full screen when no game)
         mediaDisplay = new MediaManager(this);
         
-        // Game interface container (hidden by default)
         gameInterfaceWidget = new QWidget(this);
         gameInterfaceWidget->hide();
         setupGameInterface();
         
-        // Layout assembly - both widgets take full space when visible
         mainLayout->addWidget(mediaDisplay, 1);
         mainLayout->addWidget(gameInterfaceWidget, 1);
         
-        // Start with media display only
         mediaDisplay->showMediaRotation();
     }
     
-    void showGameInterface() {
+    void BowlingMainWindow::showGameInterface() {
         qDebug() << "=== SHOWING GAME INTERFACE ===";
         
-        // Hide the media display completely during game
         mediaDisplay->hide();
-        
-        // Show game interface and make it fill entire window
         gameInterfaceWidget->show();
         gameInterfaceWidget->setParent(centralWidget());
         
-        // Update layout to give game interface full space
         QVBoxLayout* mainLayout = static_cast<QVBoxLayout*>(centralWidget()->layout());
         mainLayout->setContentsMargins(0, 0, 0, 0);
         mainLayout->setSpacing(0);
@@ -789,18 +910,15 @@ void updateGameDisplay() {
         qDebug() << "=== GAME INTERFACE DISPLAY COMPLETE ===";
     }
     
-    void hideGameInterface() {
-        // Show media display and hide game interface
+    void BowlingMainWindow::hideGameInterface() {
         mediaDisplay->show();
         gameInterfaceWidget->hide();
         
-        // Restore normal layout spacing
         QVBoxLayout* mainLayout = static_cast<QVBoxLayout*>(centralWidget()->layout());
         mainLayout->setContentsMargins(5, 5, 5, 5);
     }
     
-    void setupClient() {
-        // Load settings
+    void BowlingMainWindow::setupClient() {
         QSettings settings("settings.ini", QSettings::IniFormat);
         int laneId = settings.value("Lane/id", 1).toInt();
         QString serverHost = settings.value("Server/host", "192.168.2.243").toString();
@@ -813,34 +931,12 @@ void updateGameDisplay() {
         
         client->start();
         
-        // Update lane status label with actual lane ID
         if (laneStatusLabel) {
             laneStatusLabel->setText(QString("Lane %1").arg(laneId));
         }
     }
     
-    void setupGame() {
-        qDebug() << "=== SETTING UP GAME ===";
-    
-        game = new QuickGame(this);
-        qDebug() << "Created QuickGame instance";
-    
-        // Connect signals
-        connect(game, &QuickGame::gameUpdated, this, &BowlingMainWindow::onGameUpdated);
-        connect(game, &QuickGame::specialEffect, this, &BowlingMainWindow::onSpecialEffect);
-        connect(game, &QuickGame::currentPlayerChanged, this, &BowlingMainWindow::onCurrentPlayerChanged);
-        connect(game, &QuickGame::gameStarted, this, &BowlingMainWindow::onGameStarted);
-        connect(game, &QuickGame::gameEnded, this, &BowlingMainWindow::onGameEnded);
-        connect(game, &QuickGame::ballProcessed, this, &BowlingMainWindow::onBallProcessed);
-        connect(game, &QuickGame::gameHeld, this, [this](bool held) {
-            qDebug() << "Game hold state changed to:" << held;
-            updateButtonStates();
-        });
-    
-        qDebug() << "=== GAME SETUP COMPLETE ===";
-    }
-    
-    void applyDarkTheme() {
+    void BowlingMainWindow::applyDarkTheme() {
         QString darkStyle = R"(
             QMainWindow {
                 background-color: #2b2b2b;
@@ -886,7 +982,7 @@ void updateGameDisplay() {
         setStyleSheet(darkStyle);
     }
     
-    void loadGameColors() {
+    void BowlingMainWindow::loadGameColors() {
         QSettings settings("settings.ini", QSettings::IniFormat);
         settings.beginGroup("GameColors");
         
@@ -903,7 +999,7 @@ void updateGameDisplay() {
         settings.endGroup();
     }
     
-    void applyGameColors() {
+    void BowlingMainWindow::applyGameColors() {
         if (gameColors.isEmpty()) return;
     
         int colorIndex = (currentGameNumber - 1) % gameColors.size();
@@ -933,7 +1029,7 @@ void updateGameDisplay() {
         }
     }
 
-    void sendGameStatus() {
+    void BowlingMainWindow::sendGameStatus() {
         if (!gameActive || !game) return;
         
         QJsonObject status;
@@ -957,7 +1053,7 @@ void updateGameDisplay() {
         client->sendMessage(status);
     }
     
-    void updateGameStatus() {
+    void BowlingMainWindow::updateGameStatus() {
         if (!gameActive || !game || game->getBowlers().isEmpty() || !gameStatus) {
             if (gameStatus) {
                 gameStatus->resetStatus();
@@ -998,7 +1094,7 @@ void updateGameDisplay() {
     QJsonObject currentGameData;
     ScrollTextWidget* messageScrollArea;
     PinDisplayWidget* pinDisplay;
-    QLabel* laneStatusLabel; // For call mode flashing
+    QLabel* laneStatusLabel;
     
     QPushButton* holdButton;
     QPushButton* skipButton;
@@ -1006,6 +1102,8 @@ void updateGameDisplay() {
     
     LaneClient* client;
     QuickGame* game;
+    
+    MachineInterface* machineInterface;
     
     // Game state
     bool gameActive;

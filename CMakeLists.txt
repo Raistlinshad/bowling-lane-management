@@ -4,7 +4,7 @@ project(Canadian5PinBowling VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Qt5 components one by one for better error reporting
+# Find Qt5 components
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Network REQUIRED)
@@ -27,6 +27,7 @@ set(SOURCES
     GameStatistics.cpp
     GameRecoveryManager.cpp
     MediaManager.cpp
+    MachineInterface.cpp  # New C++ machine interface
 )
 
 # Header files
@@ -38,9 +39,28 @@ set(HEADERS
     GameStatistics.h
     GameRecoveryManager.h
     MediaManager.h
+    MachineInterface.h    # New C++ machine interface
 )
 
-# Check if manager classes exist, if not create stubs
+# Check target architecture for GPIO support
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    message(STATUS "Building for ARM architecture - enabling GPIO support")
+    add_definitions(-DARM_TARGET)
+    
+    # Find wiringPi library for Raspberry Pi GPIO access
+    find_library(WIRINGPI_LIB wiringPi HINTS /usr/lib /usr/local/lib)
+    
+    if(WIRINGPI_LIB)
+        message(STATUS "Found wiringPi library: ${WIRINGPI_LIB}")
+        add_definitions(-DGPIO_AVAILABLE)
+    else()
+        message(WARNING "wiringPi library not found - GPIO functionality will be disabled")
+    endif()
+else()
+    message(STATUS "Building for non-ARM architecture - GPIO simulation mode")
+endif()
+
+# Create stubs for missing components (same as before)
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/GameRecoveryManager.cpp)
     message(STATUS "Creating GameRecoveryManager stub")
     file(WRITE ${CMAKE_BINARY_DIR}/GameRecoveryManagerStub.cpp
@@ -123,18 +143,17 @@ else()
     list(APPEND HEADERS ThreeSixNineTracker.h)
 endif()
 
-# Add MediaManager - only one version, no duplicates
+# Handle MediaManager
 if(EXISTS ${CMAKE_SOURCE_DIR}/MediaManager.cpp AND EXISTS ${CMAKE_SOURCE_DIR}/MediaManager.h)
     message(STATUS "Using existing MediaManager.cpp")
-    # MediaManager.cpp and MediaManager.h are already in SOURCES and HEADERS lists above
     if(Qt5Multimedia_FOUND AND Qt5MultimediaWidgets_FOUND)
         add_definitions(-DMULTIMEDIA_SUPPORT)
         message(STATUS "MediaManager built with multimedia support")
     else()
-        message(STATUS "MediaManager built without multimedia support (using stubs)")
+        message(STATUS "MediaManager built without multimedia support")
     endif()
 else()
-    message(STATUS "Creating MediaManager stub - MediaManager.cpp not found")
+    message(STATUS "Creating MediaManager stub")
     file(WRITE ${CMAKE_BINARY_DIR}/MediaManagerStub.cpp
         "#include <QStackedWidget>\n"
         "#include <QLabel>\n"
@@ -164,15 +183,35 @@ else()
         "};\n"
         "#include \"MediaManagerStub.moc\"\n"
     )
-    # Remove MediaManager.cpp and MediaManager.h from the lists and add the stub
     list(REMOVE_ITEM SOURCES MediaManager.cpp)
     list(REMOVE_ITEM HEADERS MediaManager.h)
     list(APPEND SOURCES ${CMAKE_BINARY_DIR}/MediaManagerStub.cpp)
 endif()
+
+# Create MachineInterface.cpp if it doesn't exist
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/MachineInterface.cpp)
+    message(STATUS "Creating MachineInterface.cpp file")
+    file(WRITE ${CMAKE_SOURCE_DIR}/MachineInterface.cpp
+        "#include \"MachineInterface.h\"\n"
+        "#include <QDateTime>\n"
+        "#include <QRandomGenerator>\n"
+        "#include <QFile>\n"
+        "#include <QJsonDocument>\n"
+        "#include <QJsonArray>\n"
+        "\n"
+        "// The implementation is in the header file for now\n"
+        "// This file exists to satisfy CMake requirements\n"
+    )
+endif()
+
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/MachineInterface.h)
+    message(STATUS "MachineInterface.h will need to be created - see provided code")
+endif()
+
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
-# Link libraries
+# Link Qt libraries
 target_link_libraries(${PROJECT_NAME}
     Qt5::Core
     Qt5::Widgets
@@ -188,45 +227,45 @@ if(Qt5Multimedia_FOUND AND Qt5MultimediaWidgets_FOUND)
     )
 endif()
 
-# Copy files
-if(EXISTS ${CMAKE_SOURCE_DIR}/machine_interface.py)
-    configure_file(${CMAKE_SOURCE_DIR}/machine_interface.py ${CMAKE_BINARY_DIR}/machine_interface.py COPYONLY)
+# Link wiringPi library for GPIO if available
+if(WIRINGPI_LIB)
+    target_link_libraries(${PROJECT_NAME} ${WIRINGPI_LIB})
+    message(STATUS "Linked wiringPi library for GPIO support")
 endif()
 
-if(EXISTS ${CMAKE_SOURCE_DIR}/settings.json)
-    configure_file(${CMAKE_SOURCE_DIR}/settings.json ${CMAKE_BINARY_DIR}/settings.json COPYONLY)
-endif()
+# Copy configuration files
+configure_file(${CMAKE_SOURCE_DIR}/settings.json ${CMAKE_BINARY_DIR}/settings.json COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/settings.ini ${CMAKE_BINARY_DIR}/settings.ini COPYONLY)
 
-if(EXISTS ${CMAKE_SOURCE_DIR}/settings.ini)
-    configure_file(${CMAKE_SOURCE_DIR}/settings.ini ${CMAKE_BINARY_DIR}/settings.ini COPYONLY)
-endif()
-
-# Create media directory structure
+# Create directory structure
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/ads)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/ads/images)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/ads/videos)
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects/videos)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects/images)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/media/effects/audio)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/logs)
 
-# Create placeholder files to show directory structure
-file(WRITE ${CMAKE_BINARY_DIR}/media/ads/images/README.txt 
-    "Place advertisement images here.\nSupported formats: jpg, jpeg, png, bmp, gif\n")
-file(WRITE ${CMAKE_BINARY_DIR}/media/ads/videos/README.txt 
-    "Place advertisement videos here.\nSupported formats: mp4, avi, mov, mkv\n")
-file(WRITE ${CMAKE_BINARY_DIR}/media/effects/videos/README.txt 
-    "Place effect celebration videos here.\nFiles should be named:\n- strike.mp4\n- spare.mp4\n- turkey.mp4\n- perfect.mp4\n- split.mp4\n")
-file(WRITE ${CMAKE_BINARY_DIR}/media/effects/images/README.txt 
-    "Place effect celebration images here.\nFiles should be named:\n- strike.png\n- spare.png\n- turkey.png\n- perfect.png\n")
-file(WRITE ${CMAKE_BINARY_DIR}/media/effects/audio/README.txt 
-    "Place effect celebration audio here.\nFiles should be named:\n- strike.wav\n- spare.wav\n- turkey.wav\n- perfect.wav\n")
+# Installation instructions for wiringPi
+if(NOT WIRINGPI_LIB AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64"))
+    message(STATUS "")
+    message(STATUS "=== GPIO Setup Instructions ===")
+    message(STATUS "To enable GPIO support on Raspberry Pi, install wiringPi:")
+    message(STATUS "  sudo apt-get update")
+    message(STATUS "  sudo apt-get install wiringpi")
+    message(STATUS "")
+    message(STATUS "Or install from source:")
+    message(STATUS "  git clone https://github.com/WiringPi/WiringPi.git")
+    message(STATUS "  cd WiringPi")
+    message(STATUS "  ./build")
+    message(STATUS "")
+    message(STATUS "Then re-run cmake to detect the library.")
+    message(STATUS "===============================")
+    message(STATUS "")
+endif()
 
-message(STATUS "Media directory structure created")
-message(STATUS "  Advertisement images: ${CMAKE_BINARY_DIR}/media/ads/images/")  
-message(STATUS "  Advertisement videos: ${CMAKE_BINARY_DIR}/media/ads/videos/")
-message(STATUS "  Effect videos: ${CMAKE_BINARY_DIR}/media/effects/videos/")
-message(STATUS "  Effect images: ${CMAKE_BINARY_DIR}/media/effects/images/")
-message(STATUS "  Effect audio: ${CMAKE_BINARY_DIR}/media/effects/audio/")
+message(STATUS "Build configuration complete:")
+message(STATUS "  Target architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "  GPIO support: ${WIRINGPI_LIB}")
+message(STATUS "  Multimedia support: ${Qt5Multimedia_FOUND}")
+message(STATUS "  Build directory: ${CMAKE_BINARY_DIR}")

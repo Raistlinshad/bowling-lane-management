@@ -219,202 +219,12 @@ void Bowler::fromJson(const QJsonObject& json) {
     }
 }
 
-// MachineInterface class implementation
-MachineInterface::MachineInterface(QObject* parent) 
-    : QObject(parent), pythonProcess(nullptr), heartbeatTimer(nullptr), machineIsReady(false) {
-    setupProcess();
-}
-
-MachineInterface::~MachineInterface() {
-    stopDetection();
-}
-
-void MachineInterface::setupProcess() {
-    pythonProcess = new QProcess(this);
-    
-    // Set lower priority for machine process on Pi
-    pythonProcess->setProgram("nice");
-    pythonProcess->setArguments(QStringList() << "-n" << "10" << "python3" << "machine_interface.py");
-    
-    connect(pythonProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, &MachineInterface::onProcessFinished);
-    connect(pythonProcess, &QProcess::readyReadStandardOutput,
-            this, &MachineInterface::onDataReady);
-    connect(pythonProcess, &QProcess::errorOccurred,
-            this, &MachineInterface::onErrorOccurred);
-    
-    // Longer heartbeat interval for Pi 3
-    heartbeatTimer = new QTimer(this);
-    heartbeatTimer->setInterval(45000); // 45 seconds instead of 30
-    connect(heartbeatTimer, &QTimer::timeout, this, [this]() {
-        sendCommand("ping");
-    });
-}
-
-void MachineInterface::startDetection() {
-    if (pythonProcess->state() != QProcess::NotRunning) {
-        qDebug() << "Machine interface process already running, skipping start";
-        return;
-    }
-    
-    qDebug() << "Starting machine interface process";
-    
-    // Use single-threaded approach for Raspberry Pi
-    QStringList arguments;
-    arguments << "machine_interface.py";
-    
-    pythonProcess->start("python3", arguments);
-    
-    if (pythonProcess->waitForStarted(5000)) {
-        heartbeatTimer->start();
-        
-        // Send start detection command after a short delay
-        QTimer::singleShot(1000, this, [this]() {
-            sendCommand("start_detection");
-        });
-        
-        emit machineStatusChanged("starting");
-    } else {
-        emit machineError("Failed to start machine interface process");
-    }
-}
-
-void MachineInterface::stopDetection() {
-    if (pythonProcess && pythonProcess->state() != QProcess::NotRunning) {
-        sendCommand("stop_detection");
-        
-        // Give process time to stop gracefully
-        pythonProcess->terminate();
-        if (!pythonProcess->waitForFinished(3000)) {
-            pythonProcess->kill();
-            pythonProcess->waitForFinished(1000);
-        }
-    }
-    
-    if (heartbeatTimer) {
-        heartbeatTimer->stop();
-    }
-    
-    machineIsReady = false;
-    emit machineStatusChanged("stopped");
-}
-
-bool MachineInterface::isRunning() const {
-    return pythonProcess && pythonProcess->state() == QProcess::Running && machineIsReady;
-}
-
-void MachineInterface::sendCommand(const QString& command, const QJsonObject& data) {
-    if (!pythonProcess || pythonProcess->state() != QProcess::Running) {
-        qWarning() << "Cannot send command - machine interface not running";
-        return;
-    }
-    
-    QJsonObject cmd;
-    cmd["type"] = command;
-    if (!data.isEmpty()) {
-        cmd["data"] = data;
-    }
-    cmd["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-    
-    QJsonDocument doc(cmd);
-    QByteArray cmdData = doc.toJson(QJsonDocument::Compact) + "\n";
-    
-    pythonProcess->write(cmdData);
-    pythonProcess->waitForBytesWritten(1000);
-}
-
-void MachineInterface::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
-    Q_UNUSED(exitStatus)
-    
-    machineIsReady = false;
-    heartbeatTimer->stop();
-    
-    if (exitCode != 0) {
-        emit machineError(QString("Machine process exited with code %1").arg(exitCode));
-    }
-    
-    emit machineStatusChanged("stopped");
-}
-
-void MachineInterface::onDataReady() {
-    QByteArray data = pythonProcess->readAllStandardOutput();
-    QStringList lines = QString::fromUtf8(data).split('\n', Qt::SkipEmptyParts);
-    
-    for (const QString& line : lines) {
-        processMachineOutput(line.trimmed());
-    }
-}
-
-void MachineInterface::onErrorOccurred(QProcess::ProcessError error) {
-    QString errorString;
-    switch (error) {
-        case QProcess::FailedToStart:
-            errorString = "Failed to start machine interface";
-            break;
-        case QProcess::Crashed:
-            errorString = "Machine interface crashed";
-            break;
-        case QProcess::Timedout:
-            errorString = "Machine interface timed out";
-            break;
-        default:
-            errorString = "Unknown machine interface error";
-            break;
-    }
-    
-    machineIsReady = false;
-    emit machineError(errorString);
-    emit machineStatusChanged("error");
-}
-
-void MachineInterface::processMachineOutput(const QString& line) {
-    if (line.isEmpty()) return;
-    
-    QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(line.toUtf8(), &error);
-    
-    if (error.error != QJsonParseError::NoError) {
-        qWarning() << "Invalid JSON from machine interface:" << error.errorString();
-        return;
-    }
-    
-    QJsonObject obj = doc.object();
-    QString type = obj["type"].toString();
-    
-    if (type == "ball_detected") {
-        QJsonArray pinsArray = obj["pins"].toArray();
-        QVector<int> pins;
-        for (const QJsonValue& value : pinsArray) {
-            pins.append(value.toInt());
-        }
-        if (pins.size() == 5) {
-            emit ballDetected(pins);
-        }
-    } else if (type == "machine_ready") {
-        machineIsReady = true;
-        emit machineReady();
-        emit machineStatusChanged("ready");
-    } else if (type == "error") {
-        lastError = obj["message"].toString();
-        emit machineError(lastError);
-    } else if (type == "pong") {
-        // Heartbeat response - connection is alive
-    } else if (type == "status") {
-        machineIsReady = obj["machine_initialized"].toBool() && obj["detection_active"].toBool();
-        emit machineStatusChanged(machineIsReady ? "ready" : "not_ready");
-    }
-}
-
 // QuickGame class implementation
 QuickGame::QuickGame(QObject* parent) 
     : QObject(parent), currentBowlerIndex(0), gameActive(false), isHeld(false), 
       machineEnabled(true), timeLimit(0), gameLimit(0), gamesPlayed(0) {
-    
-    machine = new MachineInterface(this);
-    
-    connect(machine, &MachineInterface::ballDetected, this, &QuickGame::onBallDetected);
-    connect(machine, &MachineInterface::machineError, this, &QuickGame::onMachineError);
-    connect(machine, &MachineInterface::machineReady, this, &QuickGame::onMachineReady);
+
+    machine = nullptr;
     
     gameTimer = new QTimer(this);
     gameTimer->setSingleShot(false);
@@ -471,9 +281,6 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     gamesPlayed = 0;
     
     qDebug() << "Game settings - time limit:" << timeLimit << "game limit:" << gameLimit;
-    
-    // FIXED: Start machine interface ONCE with proper threading control
-    startMachineInterface();
     
     // Initialize game state
     currentBowlerIndex = 0;
@@ -538,9 +345,6 @@ void QuickGame::endGame() {
     isHeld = false;
     gameTimer->stop();
     
-    // Stop machine interface if running
-    stopMachineInterface();
-    
     // Create final results
     QJsonObject results;
     results["game_type"] = "ended_by_replacement";
@@ -591,6 +395,27 @@ void QuickGame::removePlayer(const QString& playerName) {
     }
 }
 
+void QuickGame::processBallDetection(const QJsonObject& ballData) {
+    if (!gameActive || isHeld || bowlers.isEmpty()) {
+        qDebug() << "Ball detection ignored - game not active, held, or no bowlers";
+        return;
+    }
+    
+    // Extract pin states from ballData
+    QJsonArray pinsArray = ballData["pins"].toArray();
+    QVector<int> pins;
+    for (const QJsonValue& value : pinsArray) {
+        pins.append(value.toInt());
+    }
+    
+    // Process through existing logic
+    processBall(pins);
+    
+    // Emit the ball processed signal with the provided data
+    emit ballProcessed(ballData);
+}
+
+
 void QuickGame::processBall(const QVector<int>& pins) {
     if (!gameActive || isHeld || bowlers.isEmpty()) {
         qDebug() << "Ball ignored - game not active, held, or no bowlers";
@@ -638,12 +463,6 @@ void QuickGame::processBall(const QVector<int>& pins) {
 
 void QuickGame::holdGame() {
     isHeld = !isHeld;
-    
-    if (machine && machine->isRunning()) {
-        QJsonObject holdData;
-        holdData["held"] = isHeld;
-        machine->sendCommand("hold", holdData);
-    }
     
     emit gameHeld(isHeld);
     qDebug() << "Game" << (isHeld ? "held" : "resumed");
@@ -819,12 +638,13 @@ QJsonObject QuickGame::getGameStatistics() const {
 }
 
 void QuickGame::onMachineError(const QString& error) {
-    qWarning() << "Machine error:" << error;
+    qWarning() << "Machine error (forwarded from main):" << error;
     emit errorOccurred(error);
 }
 
 void QuickGame::onMachineReady() {
-    qDebug() << "Machine interface ready";
+    qDebug() << "Machine ready (forwarded from main)";
+    // No special action needed
 }
 
 void QuickGame::onGameTimer() {
@@ -974,52 +794,18 @@ void QuickGame::checkForSpecialEvents(const Ball& ball, const Frame& frame) {
 }
 
 void QuickGame::startMachineInterface() {
-    if (!machineEnabled || !machine) {
-        qDebug() << "Machine interface disabled or not available";
-        return;
-    }
-    
-    // CRITICAL: Prevent duplicate starts
-    if (s_machineInterfaceStarted) {
-        qDebug() << "Machine interface already started, skipping duplicate call";
-        return;
-    }
-    
-    s_machineInterfaceStarted = true;
-    qDebug() << "Starting machine interface for ball detection";
-    
-    // Start detection only once
-    machine->startDetection();
-    
-    // Verify machine is running after a delay
-    QTimer::singleShot(2000, this, [this]() {
-        if (machine && machine->isRunning()) {
-            qDebug() << "Machine interface successfully started and running";
-        } else {
-            qWarning() << "Machine interface failed to start properly";
-            s_machineInterfaceStarted = false; // Reset flag on failure
-            emit errorOccurred("Ball detection system failed to start");
-        }
-    });
+    // Remove this method entirely - main window handles machine interface
+    qDebug() << "Machine interface is now handled by main window";
 }
 
 void QuickGame::stopMachineInterface() {
-    if (machine) {
-        machine->stopDetection();
-    }
-    
-    // Reset the flag so machine can be started again
-    s_machineInterfaceStarted = false;
-    qDebug() << "Machine interface stopped, flag reset";
+    // Remove this method entirely - main window handles machine interface
+    qDebug() << "Machine interface is now handled by main window";
 }
 
 void QuickGame::sendMachineCommand(const QString& command, const QJsonObject& data) {
-    if (machine && machine->isRunning()) {
-        qDebug() << "Sending machine command:" << command;
-        machine->sendCommand(command, data);
-    } else {
-        qWarning() << "Cannot send machine command - interface not running";
-    }
+    qDebug() << "Machine command ignored - handled by main window:" << command;
+    // Main window will handle machine commands through its machine interface
 }
 
 bool QuickGame::validateGameState() const {
@@ -1058,16 +844,8 @@ bool QuickGame::validateBowlerData(const Bowler& bowler) const {
 
 // Add ball processing integration:
 void QuickGame::onBallDetected(const QVector<int>& pins) {
-    qDebug() << "Ball detected with pins:" << pins;
-    
-    if (!gameActive || isHeld || bowlers.isEmpty()) {
-        qDebug() << "Ball ignored - game not active, held, or no bowlers";
-        return;
-    }
-    
-    // Process the ball through the game logic
+    // This method may not be called directly anymore
+    // Instead, main window calls processBallDetection()
+    qDebug() << "Direct ball detection (should use processBallDetection instead):" << pins;
     processBall(pins);
-    
-    // Update UI
-    emit gameUpdated();
 }
