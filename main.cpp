@@ -584,6 +584,11 @@ private:
             qDebug() << "Game not active or null, skipping display update";
             return;
         }
+
+        qDebug() << "updateGameDisplay called, pinDisplay ptr:" << pinDisplay;
+        if (pinDisplay) {
+            qDebug() << "pinDisplay parent:" << pinDisplay->parent() << "isWidgetType:" << pinDisplay->isWidgetType();
+        }
         
         // Clear existing bowler widgets
         QLayoutItem* item;
@@ -644,7 +649,7 @@ private:
         gameWidgetLayout->addStretch();
         
         // SINGLE pin display update section
-        if (pinDisplay && pinDisplay->isVisible()) {
+        if (pinDisplay) {
             try {
                 QVector<int> pinStates;
             
