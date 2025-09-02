@@ -5,7 +5,6 @@
 #include <QJsonArray>
 #include <QRandomGenerator>
 
-// Add missing ADS I2C handles declaration
 #ifdef GPIO_AVAILABLE
 int MachineInterface::ads1_handle = -1;
 int MachineInterface::ads2_handle = -1;
@@ -23,7 +22,7 @@ MachineInterface::MachineInterface(QObject* parent)
     , ballDetectionCounter(0)
     , detectionThreshold(10)
     , debounceTimeMs(500)
-    , currentPinStates({1,1,1,1,1})  // All pins up initially
+    , currentPinStates({1,1,1,1,1}) 
     , targetPinStates({1,1,1,1,1})
     , machineInOperation(false)
     , machineCycleTimeSeconds(8.5)
