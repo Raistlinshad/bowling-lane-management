@@ -100,10 +100,6 @@ public:
     }
 
 private slots:
-    void onBallDetected(const QVector<int>& pinStates);  // Fixed signature - remove totalValue
-    void onMachineReady();
-    void onMachineError(const QString& error);
-    void onPinStatesChanged(const QVector<int>& states);
 
     void onGameUpdated() {
         updateGameDisplay();
@@ -718,7 +714,7 @@ private:
     
         // Process the ball through your game logic
         // You may need to modify QuickGame to accept this format
-        if (game && game->canProcessBall()) {
+        if (game) {
             if (game) {
                 game->processBallDetection(ballData);
             }
@@ -787,13 +783,13 @@ private:
     
         // Connect machine interface signals
         connect(machineInterface, &MachineInterface::ballDetected, 
-                this, &BowlingMainWindow::onBallDetected);
+                this, onBallDetected);
         connect(machineInterface, &MachineInterface::machineReady,
-                this, &BowlingMainWindow::onMachineReady);
+                this, onMachineReady);
         connect(machineInterface, &MachineInterface::machineError,
-                this, &BowlingMainWindow::onMachineError);
+                this, onMachineError);
         connect(machineInterface, &MachineInterface::pinStatesChanged,
-                this, &BowlingMainWindow::onPinStatesChanged);
+                this, onPinStatesChanged);
     
         // Initialize machine interface
         if (!machineInterface->initialize()) {
