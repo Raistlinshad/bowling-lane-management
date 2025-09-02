@@ -586,7 +586,7 @@ private:
         }
 
         qDebug() << "updateGameDisplay called, pinDisplay ptr:" << pinDisplay;
-        if (pinDisplay) {
+        if (false && pinDisplay && pinDisplay->isVisible()) {
             qDebug() << "pinDisplay parent:" << pinDisplay->parent() << "isWidgetType:" << pinDisplay->isWidgetType();
         }
         
