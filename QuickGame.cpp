@@ -322,14 +322,6 @@ void QuickGame::resetGame() {
     currentBowlerIndex = 0;
     gamesPlayed = 0;
     
-    // Reset machine
-    if (machine && machine->isRunning()) {
-        QJsonObject resetData;
-        resetData["immediate"] = true;
-        resetData["reset_type"] = "FULL_RESET";
-        machine->sendCommand("machine_reset", resetData);
-    }
-    
     emit gameUpdated();
 }
 
@@ -848,4 +840,5 @@ void QuickGame::onBallDetected(const QVector<int>& pins) {
     // Instead, main window calls processBallDetection()
     qDebug() << "Direct ball detection (should use processBallDetection instead):" << pins;
     processBall(pins);
+
 }
