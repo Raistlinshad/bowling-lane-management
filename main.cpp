@@ -424,44 +424,7 @@ private:
         laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
     
         bottomBarLayout->addWidget(messageScrollArea, 1);
-        bottomBarLayout->addSpacing(10);
-    
-        // Pin Display with error handling
-        try {
-            pinDisplay = new PinDisplayWidget(this);
-            pinDisplay->setDisplayMode("small");
-            pinDisplay->setFixedSize(120, 40);
-        
-            // Set default safe state
-            QVector<int> defaultStates = {1, 1, 1, 1, 1};
-            pinDisplay->setPinStates(defaultStates);
-        
-            bottomBarLayout->addWidget(pinDisplay);
-            qDebug() << "Pin display initialized successfully";
-        
-        } catch (const std::exception& e) {
-            qWarning() << "Failed to initialize pin display:" << e.what();
-            pinDisplay = nullptr;
-        
-            // Create placeholder label instead
-            QLabel* pinPlaceholder = new QLabel("PIN", this);
-            pinPlaceholder->setFixedSize(120, 40);
-            pinPlaceholder->setAlignment(Qt::AlignCenter);
-            pinPlaceholder->setStyleSheet("QLabel { background-color: #333; color: white; border: 1px solid #666; }");
-            bottomBarLayout->addWidget(pinPlaceholder);
-        
-        } catch (...) {
-            qWarning() << "Unknown error initializing pin display";
-            pinDisplay = nullptr;
-        
-            // Create placeholder
-            QLabel* pinPlaceholder = new QLabel("PIN", this);
-            pinPlaceholder->setFixedSize(120, 40);
-            pinPlaceholder->setAlignment(Qt::AlignCenter);
-            pinPlaceholder->setStyleSheet("QLabel { background-color: #333; color: white; border: 1px solid #666; }");
-            bottomBarLayout->addWidget(pinPlaceholder);
-        }
-    
+        bottomBarLayout->addSpacing(10);    
         bottomBarLayout->addWidget(laneStatusLabel);
     
         // Create bottom bar container
@@ -584,11 +547,6 @@ private:
             qDebug() << "Game not active or null, skipping display update";
             return;
         }
-
-        qDebug() << "updateGameDisplay called, pinDisplay ptr:" << pinDisplay;
-        if (false && pinDisplay && pinDisplay->isVisible()) {
-            qDebug() << "pinDisplay parent:" << pinDisplay->parent() << "isWidgetType:" << pinDisplay->isWidgetType();
-        }
         
         // Clear existing bowler widgets
         QLayoutItem* item;
@@ -648,45 +606,6 @@ private:
         
         gameWidgetLayout->addStretch();
 
-        
-        /*
-        // SINGLE pin display update section
-        if (pinDisplay) {
-            try {
-                QVector<int> pinStates;
-            
-                if (game) {
-                    pinStates = game->getCurrentPinStates();
-                
-                    if (pinStates.size() != 5) {
-                        qWarning() << "Invalid pin states size:" << pinStates.size() << "expected 5";
-                        pinStates = {1, 1, 1, 1, 1};
-                    }
-                
-                    for (int i = 0; i < pinStates.size(); ++i) {
-                        if (pinStates[i] < 0 || pinStates[i] > 1) {
-                            qWarning() << "Invalid pin state at index" << i << "value:" << pinStates[i];
-                            pinStates[i] = 1;
-                        }
-                    }
-                } else {
-                    pinStates = {1, 1, 1, 1, 1};
-                }
-            
-                QVector<int> safePinStates = pinStates;
-                pinDisplay->setPinStates(safePinStates);
-            
-            } catch (const std::exception& e) {
-                qCritical() << "Exception in pin display update:" << e.what();
-                pinDisplay->setVisible(false);
-                pinDisplay = nullptr;
-            } catch (...) {
-                qCritical() << "Unknown exception in pin display update";
-                pinDisplay->setVisible(false);
-                pinDisplay = nullptr;
-            }
-        }
-        */
     }
 
     // Machine interface slot implementations
@@ -757,15 +676,6 @@ private:
 
     void onPinStatesChanged(const QVector<int>& states) {
         qDebug() << "Pin states changed:" << states;
-        
-        // Update pin display if it exists
-        if (pinDisplay) {
-            try {
-                pinDisplay->setPinStates(states);
-            } catch (...) {
-                qWarning() << "Error updating pin display";
-            }
-        }
     }
 
     void setupGame() {
@@ -1083,7 +993,6 @@ private:
     
     QJsonObject currentGameData;
     ScrollTextWidget* messageScrollArea;
-    PinDisplayWidget* pinDisplay;
     QLabel* laneStatusLabel;
     
     QPushButton* holdButton;
