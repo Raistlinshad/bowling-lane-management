@@ -6,6 +6,7 @@
 
 // Static constants
 const QVector<int> QuickGame::PIN_VALUES = {2, 3, 5, 3, 2}; // lTwo, lThree, cFive, rThree, rTwo
+static bool s_machineInterfaceStarted = false;
 
 // Ball class implementation
 Ball::Ball(const QVector<int>& pins, int value) : pins(pins), value(value) {
@@ -231,6 +232,10 @@ MachineInterface::~MachineInterface() {
 void MachineInterface::setupProcess() {
     pythonProcess = new QProcess(this);
     
+    // Set lower priority for machine process on Pi
+    pythonProcess->setProgram("nice");
+    pythonProcess->setArguments(QStringList() << "-n" << "10" << "python3" << "machine_interface.py");
+    
     connect(pythonProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &MachineInterface::onProcessFinished);
     connect(pythonProcess, &QProcess::readyReadStandardOutput,
@@ -238,25 +243,39 @@ void MachineInterface::setupProcess() {
     connect(pythonProcess, &QProcess::errorOccurred,
             this, &MachineInterface::onErrorOccurred);
     
+    // Longer heartbeat interval for Pi 3
     heartbeatTimer = new QTimer(this);
-    heartbeatTimer->setInterval(30000); // 30 seconds
+    heartbeatTimer->setInterval(45000); // 45 seconds instead of 30
     connect(heartbeatTimer, &QTimer::timeout, this, [this]() {
         sendCommand("ping");
     });
 }
 
 void MachineInterface::startDetection() {
-    if (pythonProcess->state() == QProcess::NotRunning) {
-        qDebug() << "Starting machine interface process";
-        pythonProcess->start("python3", QStringList() << "machine_interface.py");
+    if (pythonProcess->state() != QProcess::NotRunning) {
+        qDebug() << "Machine interface process already running, skipping start";
+        return;
+    }
+    
+    qDebug() << "Starting machine interface process";
+    
+    // Use single-threaded approach for Raspberry Pi
+    QStringList arguments;
+    arguments << "machine_interface.py";
+    
+    pythonProcess->start("python3", arguments);
+    
+    if (pythonProcess->waitForStarted(5000)) {
+        heartbeatTimer->start();
         
-        if (pythonProcess->waitForStarted(5000)) {
-            heartbeatTimer->start();
+        // Send start detection command after a short delay
+        QTimer::singleShot(1000, this, [this]() {
             sendCommand("start_detection");
-            emit machineStatusChanged("starting");
-        } else {
-            emit machineError("Failed to start machine interface process");
-        }
+        });
+        
+        emit machineStatusChanged("starting");
+    } else {
+        emit machineError("Failed to start machine interface process");
     }
 }
 
@@ -264,6 +283,7 @@ void MachineInterface::stopDetection() {
     if (pythonProcess && pythonProcess->state() != QProcess::NotRunning) {
         sendCommand("stop_detection");
         
+        // Give process time to stop gracefully
         pythonProcess->terminate();
         if (!pythonProcess->waitForFinished(3000)) {
             pythonProcess->kill();
@@ -452,8 +472,7 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     
     qDebug() << "Game settings - time limit:" << timeLimit << "game limit:" << gameLimit;
     
-    // CRITICAL: Start machine interface BEFORE activating game
-    qDebug() << "Starting machine interface for ball detection";
+    // FIXED: Start machine interface ONCE with proper threading control
     startMachineInterface();
     
     // Initialize game state
@@ -464,7 +483,7 @@ void QuickGame::startGame(const QJsonObject& gameData) {
     
     qDebug() << "Game state initialized successfully";
     
-    // Emit signals
+    // Emit signals safely
     qDebug() << "About to emit gameStarted() signal";
     emit gameStarted();
     qDebug() << "Emitted gameStarted() signal";
@@ -955,28 +974,43 @@ void QuickGame::checkForSpecialEvents(const Ball& ball, const Frame& frame) {
 }
 
 void QuickGame::startMachineInterface() {
-    if (machineEnabled && machine) {
-        qDebug() << "Starting machine interface for ball detection";
-        machine->startDetection();
-        
-        // Verify machine is running
-        QTimer::singleShot(2000, this, [this]() {
-            if (machine->isRunning()) {
-                qDebug() << "Machine interface successfully started and running";
-            } else {
-                qWarning() << "Machine interface failed to start properly";
-                emit errorOccurred("Ball detection system failed to start");
-            }
-        });
-    } else {
+    if (!machineEnabled || !machine) {
         qDebug() << "Machine interface disabled or not available";
+        return;
     }
+    
+    // CRITICAL: Prevent duplicate starts
+    if (s_machineInterfaceStarted) {
+        qDebug() << "Machine interface already started, skipping duplicate call";
+        return;
+    }
+    
+    s_machineInterfaceStarted = true;
+    qDebug() << "Starting machine interface for ball detection";
+    
+    // Start detection only once
+    machine->startDetection();
+    
+    // Verify machine is running after a delay
+    QTimer::singleShot(2000, this, [this]() {
+        if (machine && machine->isRunning()) {
+            qDebug() << "Machine interface successfully started and running";
+        } else {
+            qWarning() << "Machine interface failed to start properly";
+            s_machineInterfaceStarted = false; // Reset flag on failure
+            emit errorOccurred("Ball detection system failed to start");
+        }
+    });
 }
 
 void QuickGame::stopMachineInterface() {
     if (machine) {
         machine->stopDetection();
     }
+    
+    // Reset the flag so machine can be started again
+    s_machineInterfaceStarted = false;
+    qDebug() << "Machine interface stopped, flag reset";
 }
 
 void QuickGame::sendMachineCommand(const QString& command, const QJsonObject& data) {

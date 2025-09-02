@@ -109,6 +109,7 @@ private slots:
     void onErrorOccurred(QProcess::ProcessError error);
 
 private:
+    static bool s_interfaceStarted;
     void setupProcess();
     void processMachineOutput(const QString& line);
     
@@ -259,6 +260,5 @@ private:
     static const int STRIKE_VALUE = 15;
     static const int SPARE_VALUE = 15;
 };
-
 
 #endif // QUICKGAME_H

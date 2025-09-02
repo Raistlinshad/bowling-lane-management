@@ -1,4 +1,4 @@
-#include <QApplication>
+﻿#include <QApplication>
 #include <QMainWindow>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -408,10 +408,11 @@ private:
         messageScrollArea->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 14px; border: 1px solid #555555; }");
     
         // Right: Pin Display
-        pinDisplay = new PinDisplayWidget(this);
-        pinDisplay->setDisplayMode("small");
-        pinDisplay->setFixedSize(120, 40);
-        
+        // pinDisplay = new PinDisplayWidget(this);
+        // pinDisplay->setDisplayMode("small");
+        // pinDisplay->setFixedSize(120, 40);
+
+                
         // Far Right: Lane Status for call mode
         laneStatusLabel = new QLabel(QString("Lane %1").arg(1), this);
         laneStatusLabel->setFixedSize(80, 40);
@@ -438,46 +439,72 @@ private:
     }
     
     void updateButtonStates() {
-        if (!gameActive || gameOver) {
-            // Game over state - only CALL button active
-            holdButton->setText("CALL");
-            holdButton->setEnabled(true);
-            holdButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
-            
-            skipButton->setEnabled(false);
-            skipButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
-            
-            resetButton->setEnabled(false);
-            resetButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
-            
+        // Safety check - ensure buttons exist before accessing them
+        if (!holdButton || !skipButton || !resetButton) {
+            qWarning() << "Button pointers are null in updateButtonStates()";
             return;
         }
-        
-        // Normal game state
-        if (isCallMode) {
-            holdButton->setText("CALL");
-            holdButton->setStyleSheet("QPushButton { background-color: red; color: white; font-size: 14px; font-weight: bold; }");
-        } else if (game && game->isGameHeld()) {
-            holdButton->setText("RESUME");
-            holdButton->setStyleSheet("QPushButton { background-color: green; color: white; font-size: 14px; font-weight: bold; }");
-        } else {
-            holdButton->setText("HOLD");
-            holdButton->setStyleSheet("QPushButton { background-color: blue; color: white; font-size: 14px; font-weight: bold; }");
+    
+        // Additional safety - check if buttons are valid QObject instances
+        if (holdButton->isWidgetType() == false || 
+            skipButton->isWidgetType() == false || 
+            resetButton->isWidgetType() == false) {
+            qWarning() << "Button objects are corrupted";
+            return;
         }
-        
-        // Reset button logic: RESET for first ball, SET after first ball
-        if (framesSinceFirstBall == 0) {
-            resetButton->setText("RESET");
-        } else {
-            resetButton->setText("SET");
+    
+        if (!gameActive || gameOver) {
+            // Game over state - only CALL button active
+            try {
+                holdButton->setText("CALL");
+                holdButton->setEnabled(true);
+                holdButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
+            
+                skipButton->setEnabled(false);
+                skipButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
+            
+                resetButton->setEnabled(false);
+                resetButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
+            } catch (...) {
+                qWarning() << "Exception in updateButtonStates - game over mode";
+                return;
+            }
+            return;
         }
-        resetButton->setEnabled(true);
-        resetButton->setStyleSheet("QPushButton { background-color: darkred; color: white; font-size: 14px; font-weight: bold; }");
+    
+        try {
+            // Normal game state
+            if (isCallMode) {
+                holdButton->setText("CALL");
+                holdButton->setStyleSheet("QPushButton { background-color: red; color: white; font-size: 14px; font-weight: bold; }");
+            } else if (game && game->isGameHeld()) {
+                holdButton->setText("RESUME");
+                holdButton->setStyleSheet("QPushButton { background-color: green; color: white; font-size: 14px; font-weight: bold; }");
+            } else {
+                holdButton->setText("HOLD");
+                holdButton->setStyleSheet("QPushButton { background-color: blue; color: white; font-size: 14px; font-weight: bold; }");
+            }
         
-        // Skip button
-        skipButton->setEnabled(true);
-        skipButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
+            // Reset button logic: RESET for first ball, SET after first ball
+            if (framesSinceFirstBall == 0) {
+                resetButton->setText("RESET");
+            } else {
+                resetButton->setText("SET");
+            }
+            resetButton->setEnabled(true);
+            resetButton->setStyleSheet("QPushButton { background-color: darkred; color: white; font-size: 14px; font-weight: bold; }");
+        
+            // Skip button
+            skipButton->setEnabled(true);
+            skipButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
+        
+        } catch (const std::exception& e) {
+            qWarning() << "Exception in updateButtonStates:" << e.what();
+        } catch (...) {
+            qWarning() << "Unknown exception in updateButtonStates";
+        }
     }
+
     
     void handleCloseGame() {
         qDebug() << "Received close game command";
@@ -587,6 +614,7 @@ void updateGameDisplay() {
     gameWidgetLayout->addStretch();
     
     // FIXED: Safe pin display update with validation and error handling
+
     if (pinDisplay) {
         try {
             QVector<int> pinStates;
@@ -997,15 +1025,24 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     
+    // Raspberry Pi 3 threading limits
+    QThreadPool::globalInstance()->setMaxThreadCount(2);
+    
+    // Reduce Qt's internal threading
+    app.setAttribute(Qt::AA_DisableWindowContextHelpButton);
+    app.setQuitOnLastWindowClosed(true);
+    
+    // Memory optimizations for embedded system
+    QPixmapCache::setCacheLimit(512);  // Very low for Pi 3
+    
+    // Process events more efficiently
+    app.setEffectEnabled(Qt::UI_AnimateMenu, false);
+    app.setEffectEnabled(Qt::UI_AnimateCombo, false);
+    app.setEffectEnabled(Qt::UI_AnimateTooltip, false);
+    
     app.setApplicationName("Canadian5PinBowling");
     app.setApplicationVersion("1.0");
     app.setOrganizationName("BowlingCenter");
-    
-    // Raspberry Pi 3 optimizations
-    QThreadPool::globalInstance()->setMaxThreadCount(2); // Limit to 2 threads
-    app.setAttribute(Qt::AA_DisableWindowContextHelpButton);
-    app.setQuitOnLastWindowClosed(true);
-    QPixmapCache::setCacheLimit(1024); // Reduce memory usage
     
     BowlingMainWindow window;
     window.show();
@@ -1014,5 +1051,3 @@ int main(int argc, char *argv[])
 }
 
 #include "main.moc"
-
-
