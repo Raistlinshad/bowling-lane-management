@@ -583,7 +583,7 @@ private:
         qDebug() << "3-6-9 game initialized with" << targetFrames.size() << "target frames";
     }
     
-    void BowlingMainWindow::updateGameDisplay() {
+    void updateGameDisplay() {
         if (!gameActive || !game) {
             qDebug() << "Game not active or null, skipping display update";
             return;
@@ -685,24 +685,8 @@ private:
         }
     }
 
-    // ... rest of the methods with proper scope qualifiers ...
-    void handleDisplayModeChange(const QJsonObject& data);
-    void handleTeamMove(const QJsonObject& data);
-    void handleScrollMessage(const QJsonObject& data);
-    void handleThreeSixNineToggle(const QJsonObject& data);
-    void setupUI();
-    void showGameInterface();
-    void hideGameInterface();
-    void setupClient();
-    void setupGame();
-    void applyDarkTheme();
-    void loadGameColors();
-    void applyGameColors();
-    void sendGameStatus();
-    void updateGameStatus();
-
     // Machine interface slot implementations
-    void BowlingMainWindow::onBallDetected(const QVector<int>& pinStates) {
+    void onBallDetected(const QVector<int>& pinStates) {
         if (!gameActive || !game || gameOver) {
             qDebug() << "Ball detected but game not active, ignoring";
             return;
@@ -734,7 +718,7 @@ private:
     
         // Process the ball through your game logic
         // You may need to modify QuickGame to accept this format
-        if (game->respondsTo("processBallDetection")) {
+        if (game && game->canProcessBall()) {
             if (game) {
                 game->processBallDetection(ballData);
             }
@@ -748,7 +732,7 @@ private:
         updateButtonStates();
     }
 
-    void BowlingMainWindow::onMachineReady() {
+    void onMachineReady() {
         qDebug() << "Machine interface ready";
         
         // Start ball detection when machine is ready and game is active
@@ -757,7 +741,7 @@ private:
         }
     }
 
-    void BowlingMainWindow::onMachineError(const QString& error) {
+    void onMachineError(const QString& error) {
         qWarning() << "Machine error:" << error;
         
         // Show error message
@@ -767,7 +751,7 @@ private:
         }
     }
 
-    void BowlingMainWindow::onPinStatesChanged(const QVector<int>& states) {
+    void onPinStatesChanged(const QVector<int>& states) {
         qDebug() << "Pin states changed:" << states;
         
         // Update pin display if it exists
@@ -780,7 +764,7 @@ private:
         }
     }
 
-    void BowlingMainWindow::setupGame() {
+    void setupGame() {
         qDebug() << "=== SETTING UP GAME ===";
 
         game = new QuickGame(this);
@@ -821,7 +805,7 @@ private:
     }
 
     // Add the remaining method implementations
-    void BowlingMainWindow::handleDisplayModeChange(const QJsonObject& data) {
+    void handleDisplayModeChange(const QJsonObject& data) {
         QString frameMode = data["frame_mode"].toString();
         int frameStart = data["frame_start"].toInt();
         
@@ -831,7 +815,7 @@ private:
         qDebug() << "Display mode changed to:" << frameMode << "starting at frame" << frameStart;
     }
     
-    void BowlingMainWindow::handleTeamMove(const QJsonObject& data) {
+    void handleTeamMove(const QJsonObject& data) {
         if (!gameActive) return;
         
         QString targetLane = data["target_lane"].toString();
@@ -853,9 +837,9 @@ private:
         qDebug() << "Team move initiated to lane" << targetLane;
     }
     
-    void BowlingMainWindow::handleScrollMessage(const QJsonObject& data) {
+    void handleScrollMessage(const QJsonObject& data) {
         QString text = data["text"].toString();
-        int duration = data.value("duration", 10000).toInt();
+        int duration = data.contains("duration") ? data["duration"].toInt() : 10000;
         
         messageScrollArea->setText(text);
         messageScrollArea->startScrolling();
@@ -865,7 +849,7 @@ private:
         });
     }
     
-    void BowlingMainWindow::handleThreeSixNineToggle(const QJsonObject& data) {
+    void handleThreeSixNineToggle(const QJsonObject& data) {
         if (!threeSixNine->canToggleParticipation()) return;
         
         QString bowlerName = data["bowler"].toString();
@@ -875,7 +859,7 @@ private:
         updateGameDisplay();
     }
 
-    void BowlingMainWindow::setupUI() {
+    void setupUI() {
         setWindowTitle("Canadian 5-Pin Bowling");
         setMinimumSize(1200, 800);
         
@@ -898,7 +882,7 @@ private:
         mediaDisplay->showMediaRotation();
     }
     
-    void BowlingMainWindow::showGameInterface() {
+    void showGameInterface() {
         qDebug() << "=== SHOWING GAME INTERFACE ===";
         
         mediaDisplay->hide();
@@ -912,7 +896,7 @@ private:
         qDebug() << "=== GAME INTERFACE DISPLAY COMPLETE ===";
     }
     
-    void BowlingMainWindow::hideGameInterface() {
+    void hideGameInterface() {
         mediaDisplay->show();
         gameInterfaceWidget->hide();
         
@@ -920,7 +904,7 @@ private:
         mainLayout->setContentsMargins(5, 5, 5, 5);
     }
     
-    void BowlingMainWindow::setupClient() {
+    void setupClient() {
         QSettings settings("settings.ini", QSettings::IniFormat);
         int laneId = settings.value("Lane/id", 1).toInt();
         QString serverHost = settings.value("Server/host", "192.168.2.243").toString();
@@ -938,7 +922,7 @@ private:
         }
     }
     
-    void BowlingMainWindow::applyDarkTheme() {
+    void applyDarkTheme() {
         QString darkStyle = R"(
             QMainWindow {
                 background-color: #2b2b2b;
@@ -984,7 +968,7 @@ private:
         setStyleSheet(darkStyle);
     }
     
-    void BowlingMainWindow::loadGameColors() {
+    void loadGameColors() {
         QSettings settings("settings.ini", QSettings::IniFormat);
         settings.beginGroup("GameColors");
         
@@ -1001,7 +985,7 @@ private:
         settings.endGroup();
     }
     
-    void BowlingMainWindow::applyGameColors() {
+    void applyGameColors() {
         if (gameColors.isEmpty()) return;
     
         int colorIndex = (currentGameNumber - 1) % gameColors.size();
@@ -1031,7 +1015,7 @@ private:
         }
     }
 
-    void BowlingMainWindow::sendGameStatus() {
+    void sendGameStatus() {
         if (!gameActive || !game) return;
         
         QJsonObject status;
@@ -1055,7 +1039,7 @@ private:
         client->sendMessage(status);
     }
     
-    void BowlingMainWindow::updateGameStatus() {
+    void updateGameStatus() {
         if (!gameActive || !game || game->getBowlers().isEmpty() || !gameStatus) {
             if (gameStatus) {
                 gameStatus->resetStatus();
