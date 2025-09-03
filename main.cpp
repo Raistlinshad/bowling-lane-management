@@ -437,13 +437,27 @@ private:
     }
 
     void updateButtonStates() {
+        qDebug() << "=== updateButtonStates() called ===";
+        qDebug() << "Button pointers - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
+    
         // Early return if UI not ready
         if (!holdButton || !skipButton || !resetButton) {
-            qDebug() << "updateButtonStates: UI not fully initialized yet, skipping";
+            qWarning() << "updateButtonStates: UI not fully initialized yet, skipping";
             return;
         }
 
+        // Verify buttons are still valid Qt objects
         try {
+            if (!holdButton->isWidgetType() || !skipButton->isWidgetType() || !resetButton->isWidgetType()) {
+                qCritical() << "updateButtonStates: Button pointers point to invalid objects!";
+                return;
+            }
+        
+            // Test if we can safely access the buttons
+            QString holdText = holdButton->text(); // This should not crash if button is valid
+        
+            qDebug() << "Current button state - gameActive:" << gameActive << "gameOver:" << gameOver;
+        
             if (!gameActive || gameOver) {
                 // Game is not active or finished: show CALL mode on hold button, others disabled
                 holdButton->setText("CALL");
@@ -455,6 +469,8 @@ private:
 
                 resetButton->setEnabled(false);
                 resetButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
+
+                qDebug() << "Updated buttons for inactive game state";
                 return;
             }
 
@@ -482,11 +498,17 @@ private:
             skipButton->setEnabled(true);
             skipButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
 
+            qDebug() << "Updated buttons for active game state";
+
         } catch (const std::exception& e) {
-            qWarning() << "Exception in updateButtonStates:" << e.what();
+            qCritical() << "Exception in updateButtonStates:" << e.what();
+            qCritical() << "Button pointers at exception - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
         } catch (...) {
-            qWarning() << "Unknown exception in updateButtonStates";
+            qCritical() << "Unknown exception in updateButtonStates";
+            qCritical() << "Button pointers at exception - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
         }
+    
+        qDebug() << "=== updateButtonStates() complete ===";
     }
 
     void handleCloseGame() {
@@ -762,24 +784,107 @@ private:
     void setupUI() {
         setWindowTitle("Canadian 5-Pin Bowling");
         setMinimumSize(1200, 800);
-        
+    
         QWidget* centralWidget = new QWidget(this);
         setCentralWidget(centralWidget);
-        
+    
         QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
         mainLayout->setContentsMargins(0, 0, 0, 0);
         mainLayout->setSpacing(0);
-        
+    
         mediaDisplay = new MediaManager(this);
-        
+    
         gameInterfaceWidget = new QWidget(this);
         gameInterfaceWidget->hide();
+    
+        // THIS IS THE MISSING CALL!
         setupGameInterface();
-        
+    
         mainLayout->addWidget(mediaDisplay, 1);
         mainLayout->addWidget(gameInterfaceWidget, 1);
-        
+    
         mediaDisplay->showMediaRotation();
+    }
+
+    void setupGameInterface() {
+        qDebug() << "=== SETTING UP GAME INTERFACE ===";
+    
+        QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
+        gameLayout->setContentsMargins(0, 0, 0, 0);
+        gameLayout->setSpacing(0);
+
+        // MAIN GAME AREA
+        gameDisplayArea = new QScrollArea(this);
+        gameDisplayArea->setWidgetResizable(true);
+        gameDisplayArea->setStyleSheet("QScrollArea { border: none; background-color: #2b2b2b; }");
+
+        gameWidget = new QWidget();
+        gameWidgetLayout = new QVBoxLayout(gameWidget);
+        gameWidgetLayout->setContentsMargins(10, 0, 10, 50);
+        gameDisplayArea->setWidget(gameWidget);
+
+        // BOTTOM CONTROL BAR
+        QHBoxLayout* bottomBarLayout = new QHBoxLayout();
+        bottomBarLayout->setSpacing(10);
+        bottomBarLayout->setContentsMargins(10, 5, 10, 5);
+
+        // Control Buttons - CREATE THEM FIRST
+        qDebug() << "Creating control buttons...";
+        holdButton = new QPushButton("HOLD", this);
+        skipButton = new QPushButton("SKIP", this);
+        resetButton = new QPushButton("RESET", this);
+
+        if (!holdButton || !skipButton || !resetButton) {
+            qCritical() << "FATAL: Failed to create buttons!";
+            return;
+        }
+
+        qDebug() << "Buttons created successfully:";
+        qDebug() << "  holdButton:" << (void*)holdButton;
+        qDebug() << "  skipButton:" << (void*)skipButton;  
+        qDebug() << "  resetButton:" << (void*)resetButton;
+
+        holdButton->setFixedSize(100, 40);
+        skipButton->setFixedSize(100, 40);
+        resetButton->setFixedSize(100, 40);
+
+        // CONNECT SIGNALS AFTER CREATION
+        connect(holdButton, &QPushButton::clicked, this, &BowlingMainWindow::onHoldClicked);
+        connect(skipButton, &QPushButton::clicked, this, &BowlingMainWindow::onSkipClicked);
+        connect(resetButton, &QPushButton::clicked, this, &BowlingMainWindow::onResetClicked);
+
+        bottomBarLayout->addWidget(holdButton);
+        bottomBarLayout->addWidget(skipButton);
+        bottomBarLayout->addWidget(resetButton);
+        bottomBarLayout->addSpacing(20);
+
+        // Scrolling Message Area
+        messageScrollArea = new ScrollTextWidget(this);
+        messageScrollArea->setText("Welcome to Canadian 5-Pin Bowling");
+        messageScrollArea->setFixedHeight(40);
+        messageScrollArea->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 14px; border: 1px solid #555555; }");
+
+        // Lane Status for call mode
+        laneStatusLabel = new QLabel(QString("Lane %1").arg(1), this);
+        laneStatusLabel->setFixedSize(80, 40);
+        laneStatusLabel->setAlignment(Qt::AlignCenter);
+        laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
+
+        bottomBarLayout->addWidget(messageScrollArea, 1);
+        bottomBarLayout->addSpacing(10);
+
+        // Create bottom bar container
+        QWidget* bottomBarContainer = new QWidget();
+        bottomBarContainer->setFixedHeight(50);
+        bottomBarContainer->setStyleSheet("QWidget { background-color: black; }");
+        bottomBarContainer->setLayout(bottomBarLayout);
+
+        gameWidgetLayout->addStretch();
+        gameWidgetLayout->addWidget(bottomBarContainer);
+
+        gameLayout->addWidget(gameDisplayArea, 1);
+    
+        qDebug() << "=== GAME INTERFACE SETUP COMPLETE ===";
     }
     
     void showGameInterface() {
