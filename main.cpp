@@ -439,38 +439,43 @@ private:
     }
     
     void updateButtonStates() {
-        // ... existing updateButtonStates code unchanged ...
-        if (!holdButton || !skipButton || !resetButton) {
-            qWarning() << "Button pointers are null in updateButtonStates()";
+        // Defensive pointer checks
+        if (!holdButton) {
+            qWarning() << "updateButtonStates: holdButton pointer is null";
             return;
         }
-    
-        if (holdButton->isWidgetType() == false || 
-            skipButton->isWidgetType() == false || 
-            resetButton->isWidgetType() == false) {
-            qWarning() << "Button objects are corrupted";
+        if (!skipButton) {
+            qWarning() << "updateButtonStates: skipButton pointer is null";
             return;
         }
-    
-        if (!gameActive || gameOver) {
-            try {
+        if (!resetButton) {
+            qWarning() << "updateButtonStates: resetButton pointer is null";
+            return;
+        }
+
+        // Ensure pointers are widgets
+        if (!holdButton->isWidgetType() || !skipButton->isWidgetType() || !resetButton->isWidgetType()) {
+            qWarning() << "updateButtonStates: One or more button pointers are not valid QWidget types";
+            return;
+        }
+
+        try {
+            if (!gameActive || gameOver) {
+                // Game is not active or finished: show CALL mode on hold button, others disabled
                 holdButton->setText("CALL");
                 holdButton->setEnabled(true);
                 holdButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
-            
+
                 skipButton->setEnabled(false);
                 skipButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
-            
+
                 resetButton->setEnabled(false);
                 resetButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
-            } catch (...) {
-                qWarning() << "Exception in updateButtonStates - game over mode";
+
                 return;
             }
-            return;
-        }
-    
-        try {
+
+            // Game is active and not over
             if (isCallMode) {
                 holdButton->setText("CALL");
                 holdButton->setStyleSheet("QPushButton { background-color: red; color: white; font-size: 14px; font-weight: bold; }");
@@ -481,7 +486,8 @@ private:
                 holdButton->setText("HOLD");
                 holdButton->setStyleSheet("QPushButton { background-color: blue; color: white; font-size: 14px; font-weight: bold; }");
             }
-        
+
+            // Reset button text and enablement depending on frames since first ball
             if (framesSinceFirstBall == 0) {
                 resetButton->setText("RESET");
             } else {
@@ -489,10 +495,10 @@ private:
             }
             resetButton->setEnabled(true);
             resetButton->setStyleSheet("QPushButton { background-color: darkred; color: white; font-size: 14px; font-weight: bold; }");
-        
+
             skipButton->setEnabled(true);
             skipButton->setStyleSheet("QPushButton { background-color: orange; color: black; font-size: 14px; font-weight: bold; }");
-        
+
         } catch (const std::exception& e) {
             qWarning() << "Exception in updateButtonStates:" << e.what();
         } catch (...) {
