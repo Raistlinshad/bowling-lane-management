@@ -618,10 +618,6 @@ void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ba
     if (ballLabel) {
         ballLabel->setText(QString("Ball: %1").arg(ball + 1)); // Convert to 1-based
     }
-    
-    if (pinDisplay && pinStates.size() == 5) {
-        pinDisplay->setPinStates(pinStates);
-    }
 }
 
 void GameStatusWidget::updateBallNumber(int ballNumber) {
