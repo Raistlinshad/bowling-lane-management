@@ -956,7 +956,7 @@ private:
                 gameStatus->resetStatus();
             }
             return;
-        });
+        }
     
         const Bowler& currentBowler = game->getCurrentBowler();
         const Frame& currentFrame = currentBowler.getCurrentFrame();
@@ -966,7 +966,7 @@ private:
         gameStatus->updateStatus(
             currentBowler.name,
             currentBowler.currentFrame,
-            currentFrame.balls.size(),
+            currentFrame.balls.size()
         );
     }
 
