@@ -425,7 +425,6 @@ private:
     
         bottomBarLayout->addWidget(messageScrollArea, 1);
         bottomBarLayout->addSpacing(10);    
-        bottomBarLayout->addWidget(laneStatusLabel);
     
         // Create bottom bar container
         QWidget* bottomBarContainer = new QWidget();
@@ -673,7 +672,7 @@ private:
     }
 
     void onPinStatesChanged(const QVector<int>& states) {
-        qDebug() << "Pin states changed"
+        qDebug() << "Pin states changed";
     }
 
     void setupGame() {
@@ -957,7 +956,7 @@ private:
                 gameStatus->resetStatus();
             }
             return;
-        }
+        });
     
         const Bowler& currentBowler = game->getCurrentBowler();
         const Frame& currentFrame = currentBowler.getCurrentFrame();
