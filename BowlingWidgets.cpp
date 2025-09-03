@@ -606,7 +606,7 @@ void GameStatusWidget::setupUI() {
     QFrame::setStyleSheet("QFrame { background-color: #3c3c3c; color: white; }");
 }
 
-void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ball, const QVector<int>& pinStates) {
+void GameStatusWidget::updateStatus(const QString& bowlerName, int frame, int ball) {
     if (statusLabel) {
         statusLabel->setText(QString("Current Player: %1").arg(bowlerName));
     }
