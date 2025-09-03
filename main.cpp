@@ -371,71 +371,6 @@ private slots:
 
 
 private:
-    void setupGameInterface() {
-        QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
-        gameLayout->setContentsMargins(0, 0, 0, 0);
-        gameLayout->setSpacing(0);
-
-        // MAIN GAME AREA
-        gameDisplayArea = new QScrollArea(this);
-        gameDisplayArea->setWidgetResizable(true);
-        gameDisplayArea->setStyleSheet("QScrollArea { border: none; background-color: #2b2b2b; }");
-
-        gameWidget = new QWidget();
-        gameWidgetLayout = new QVBoxLayout(gameWidget);
-        gameWidgetLayout->setContentsMargins(10, 0, 10, 50);
-        gameDisplayArea->setWidget(gameWidget);
-
-        // BOTTOM CONTROL BAR
-        QHBoxLayout* bottomBarLayout = new QHBoxLayout();
-        bottomBarLayout->setSpacing(10);
-        bottomBarLayout->setContentsMargins(10, 5, 10, 5);
-
-        // Control Buttons
-        holdButton = new QPushButton("HOLD", this);
-        skipButton = new QPushButton("SKIP", this);
-        resetButton = new QPushButton("RESET", this);
-
-        holdButton->setFixedSize(100, 40);
-        skipButton->setFixedSize(100, 40);
-        resetButton->setFixedSize(100, 40);
-
-        connect(holdButton, &QPushButton::clicked, this, &BowlingMainWindow::onHoldClicked);
-        connect(skipButton, &QPushButton::clicked, this, &BowlingMainWindow::onSkipClicked);
-        connect(resetButton, &QPushButton::clicked, this, &BowlingMainWindow::onResetClicked);
-
-        bottomBarLayout->addWidget(holdButton);
-        bottomBarLayout->addWidget(skipButton);
-        bottomBarLayout->addWidget(resetButton);
-        bottomBarLayout->addSpacing(20);
-
-        // Scrolling Message Area
-        messageScrollArea = new ScrollTextWidget(this);
-        messageScrollArea->setText("Welcome to Canadian 5-Pin Bowling");
-        messageScrollArea->setFixedHeight(40);
-        messageScrollArea->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 14px; border: 1px solid #555555; }");
-
-        // Lane Status for call mode
-        laneStatusLabel = new QLabel(QString("Lane %1").arg(1), this);
-        laneStatusLabel->setFixedSize(80, 40);
-        laneStatusLabel->setAlignment(Qt::AlignCenter);
-        laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
-
-        bottomBarLayout->addWidget(messageScrollArea, 1);
-        bottomBarLayout->addSpacing(10);
-
-        // Create bottom bar container
-        QWidget* bottomBarContainer = new QWidget();
-        bottomBarContainer->setFixedHeight(50);
-        bottomBarContainer->setStyleSheet("QWidget { background-color: black; }");
-        bottomBarContainer->setLayout(bottomBarLayout);
-
-        gameWidgetLayout->addStretch();
-        gameWidgetLayout->addWidget(bottomBarContainer);
-
-        gameLayout->addWidget(gameDisplayArea, 1);
-    }
-
     void updateButtonStates() {
         qDebug() << "=== updateButtonStates() called ===";
         qDebug() << "Button pointers - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
@@ -1139,5 +1074,6 @@ int main(int argc, char *argv[])
     
     return app.exec();
 }
+
 
 #include "main.moc"
