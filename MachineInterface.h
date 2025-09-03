@@ -82,6 +82,9 @@ private:
     
     // ADS I2C handles for pin sensors
     #ifdef GPIO_AVAILABLE
+        static int ads1_handle;
+        static int ads2_handle;
+        
         // ADS1115 sensor reading methods
         float readADS1115Channel(int adsHandle, int channel, int timeoutMs);
         int getPinIndexFromName(const QString& pinName);
@@ -113,9 +116,8 @@ private:
     QJsonObject laneSettings;
     QString pb10, pb11, pb12, pb13, pb20; // Pin sensor mappings
 
-    // Add ADS1115 register definitions to MachineInterface.h
     #ifdef GPIO_AVAILABLE
-    // ADS1115 register addresses
+    // ADS1115 register definitions
     #define ADS1115_REG_CONVERSION  0x00
     #define ADS1115_REG_CONFIG      0x01
     #define ADS1115_REG_LO_THRESH   0x02

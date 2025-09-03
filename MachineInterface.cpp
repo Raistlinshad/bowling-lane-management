@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QRandomGenerator>
 
+// Initialize static members PROPERLY
 #ifdef GPIO_AVAILABLE
 int MachineInterface::ads1_handle = -1;
 int MachineInterface::ads2_handle = -1;
@@ -42,6 +43,7 @@ MachineInterface::MachineInterface(QObject* parent)
 MachineInterface::~MachineInterface() {
     shutdown();
 }
+
 
 // Initialize the machine interface
 bool MachineInterface::initialize() {

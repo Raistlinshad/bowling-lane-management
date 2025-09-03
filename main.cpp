@@ -381,15 +381,25 @@ private:
             return;
         }
 
-        // Verify buttons are still valid Qt objects
+        // More robust Qt object validation
         try {
-            if (!holdButton->isWidgetType() || !skipButton->isWidgetType() || !resetButton->isWidgetType()) {
-                qCritical() << "updateButtonStates: Button pointers point to invalid objects!";
+            // Check if objects are still valid by trying to access their metaObject
+            const QMetaObject* holdMeta = holdButton->metaObject();
+            const QMetaObject* skipMeta = skipButton->metaObject();
+            const QMetaObject* resetMeta = resetButton->metaObject();
+        
+            if (!holdMeta || !skipMeta || !resetMeta) {
+                qCritical() << "updateButtonStates: Button metaObjects are null!";
                 return;
             }
         
-            // Test if we can safely access the buttons
-            QString holdText = holdButton->text(); // This should not crash if button is valid
+            // Additional safety check - verify these are actually QPushButtons
+            if (!qobject_cast<QPushButton*>(holdButton) || 
+                !qobject_cast<QPushButton*>(skipButton) || 
+                !qobject_cast<QPushButton*>(resetButton)) {
+                qCritical() << "updateButtonStates: Objects are not QPushButtons!";
+                return;
+            }
         
             qDebug() << "Current button state - gameActive:" << gameActive << "gameOver:" << gameOver;
         
@@ -437,10 +447,16 @@ private:
 
         } catch (const std::exception& e) {
             qCritical() << "Exception in updateButtonStates:" << e.what();
-            qCritical() << "Button pointers at exception - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
+            qCritical() << "Button addresses - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
+        
+            // Try to get more info about the button states
+            if (holdButton) {
+                qDebug() << "holdButton parent:" << (void*)holdButton->parent();
+                qDebug() << "holdButton class name:" << holdButton->metaObject()->className();
+            }
         } catch (...) {
             qCritical() << "Unknown exception in updateButtonStates";
-            qCritical() << "Button pointers at exception - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
+            qCritical() << "Button addresses - hold:" << (void*)holdButton << "skip:" << (void*)skipButton << "reset:" << (void*)resetButton;
         }
     
         qDebug() << "=== updateButtonStates() complete ===";
@@ -743,7 +759,7 @@ private:
 
     void setupGameInterface() {
         qDebug() << "=== SETTING UP GAME INTERFACE ===";
-    
+
         QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
         gameLayout->setContentsMargins(0, 0, 0, 0);
         gameLayout->setSpacing(0);
@@ -763,11 +779,16 @@ private:
         bottomBarLayout->setSpacing(10);
         bottomBarLayout->setContentsMargins(10, 5, 10, 5);
 
-        // Control Buttons - CREATE THEM FIRST
+        // Create bottom bar container FIRST - this will be the parent for buttons
+        QWidget* bottomBarContainer = new QWidget(gameInterfaceWidget);
+        bottomBarContainer->setFixedHeight(50);
+        bottomBarContainer->setStyleSheet("QWidget { background-color: black; }");
+
+        // Control Buttons - CREATE THEM WITH PROPER PARENT
         qDebug() << "Creating control buttons...";
-        holdButton = new QPushButton("HOLD", this);
-        skipButton = new QPushButton("SKIP", this);
-        resetButton = new QPushButton("RESET", this);
+        holdButton = new QPushButton("HOLD", bottomBarContainer);  // Use bottomBarContainer as parent
+        skipButton = new QPushButton("SKIP", bottomBarContainer);  // Use bottomBarContainer as parent
+        resetButton = new QPushButton("RESET", bottomBarContainer); // Use bottomBarContainer as parent
 
         if (!holdButton || !skipButton || !resetButton) {
             qCritical() << "FATAL: Failed to create buttons!";
@@ -775,9 +796,9 @@ private:
         }
 
         qDebug() << "Buttons created successfully:";
-        qDebug() << "  holdButton:" << (void*)holdButton;
-        qDebug() << "  skipButton:" << (void*)skipButton;  
-        qDebug() << "  resetButton:" << (void*)resetButton;
+        qDebug() << "  holdButton:" << (void*)holdButton << "parent:" << (void*)holdButton->parent();
+        qDebug() << "  skipButton:" << (void*)skipButton << "parent:" << (void*)skipButton->parent();
+        qDebug() << "  resetButton:" << (void*)resetButton << "parent:" << (void*)resetButton->parent();
 
         holdButton->setFixedSize(100, 40);
         skipButton->setFixedSize(100, 40);
@@ -794,13 +815,13 @@ private:
         bottomBarLayout->addSpacing(20);
 
         // Scrolling Message Area
-        messageScrollArea = new ScrollTextWidget(this);
+        messageScrollArea = new ScrollTextWidget(bottomBarContainer);
         messageScrollArea->setText("Welcome to Canadian 5-Pin Bowling");
         messageScrollArea->setFixedHeight(40);
         messageScrollArea->setStyleSheet("QLabel { background-color: black; color: yellow; font-size: 14px; border: 1px solid #555555; }");
 
         // Lane Status for call mode
-        laneStatusLabel = new QLabel(QString("Lane %1").arg(1), this);
+        laneStatusLabel = new QLabel(QString("Lane %1").arg(1), bottomBarContainer);
         laneStatusLabel->setFixedSize(80, 40);
         laneStatusLabel->setAlignment(Qt::AlignCenter);
         laneStatusLabel->setStyleSheet("QLabel { color: white; font-size: 18px; font-weight: bold; background-color: black; }");
@@ -808,17 +829,14 @@ private:
         bottomBarLayout->addWidget(messageScrollArea, 1);
         bottomBarLayout->addSpacing(10);
 
-        // Create bottom bar container
-        QWidget* bottomBarContainer = new QWidget();
-        bottomBarContainer->setFixedHeight(50);
-        bottomBarContainer->setStyleSheet("QWidget { background-color: black; }");
+        // Set layout AFTER creating all widgets
         bottomBarContainer->setLayout(bottomBarLayout);
 
         gameWidgetLayout->addStretch();
         gameWidgetLayout->addWidget(bottomBarContainer);
 
         gameLayout->addWidget(gameDisplayArea, 1);
-    
+
         qDebug() << "=== GAME INTERFACE SETUP COMPLETE ===";
     }
     
@@ -1074,6 +1092,5 @@ int main(int argc, char *argv[])
     
     return app.exec();
 }
-
 
 #include "main.moc"
