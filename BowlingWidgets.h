@@ -98,7 +98,7 @@ class GameStatusWidget : public QFrame {
 public:
     explicit GameStatusWidget(QWidget* parent = nullptr);
     
-    void updateStatus(const QString& bowlerName, int frame, int ball, const QVector<int>& pinStates);
+    void updateStatus(const QString& bowlerName, int frame, int ball);
     void updateBallNumber(int ballNumber);
     void updateFrameNumber(int frameNumber);
     void resetStatus();
@@ -350,5 +350,6 @@ private:
     
     QVector<FrameWidgetSet> frameWidgets;
 };
+
 
 #endif // BOWLINGWIDGETS_H
