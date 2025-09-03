@@ -351,5 +351,4 @@ private:
     QVector<FrameWidgetSet> frameWidgets;
 };
 
-
 #endif // BOWLINGWIDGETS_H

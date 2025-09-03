@@ -45,58 +45,55 @@ class BowlingMainWindow : public QMainWindow {
 public:
     BowlingMainWindow(QWidget* parent = nullptr) : QMainWindow(parent), 
         gameActive(false), currentGameNumber(1), gameOver(false), isCallMode(false),
-        framesSinceFirstBall(0), flashing(false), machineInterface(nullptr) {  // Initialize to nullptr
-        
-        // Initialize systems
+        framesSinceFirstBall(0), flashing(false), machineInterface(nullptr),
+        // Initialize button pointers to nullptr
+        holdButton(nullptr), skipButton(nullptr), resetButton(nullptr) {
+    
+        // Initialize systems first (but don't connect signals yet)
         gameRecovery = new GameRecoveryManager(this);
         gameStatistics = new GameStatistics(this);
         gameStatus = new GameStatusWidget(this);
         threeSixNine = new ThreeSixNineTracker(this);
-        
+    
         // Initialize call timer
         callTimer = new QTimer(this);
         callTimer->setSingleShot(false);
-        callTimer->setInterval(500); // Flash every 500ms
+        callTimer->setInterval(500);
         connect(callTimer, &QTimer::timeout, this, &BowlingMainWindow::onCallFlash);
-        
+    
+        // CREATE UI FIRST - this initializes the button pointers
         setupUI();
-        setupClient();
-        setupGame();
         applyDarkTheme();
         loadGameColors();
-        
-        // Connect recovery system
+    
+        // THEN setup game and connections
+        setupGame();
+        setupClient();
+    
+        // Connect recovery system AFTER everything is set up
         connect(gameRecovery, &GameRecoveryManager::recoveryRequested, 
                 this, &BowlingMainWindow::onGameRecoveryRequested);
         connect(gameRecovery, &GameRecoveryManager::recoveryDeclined,
                 this, &BowlingMainWindow::onGameRecoveryDeclined);
-        
+    
         // Connect statistics system
         connect(gameStatistics, &GameStatistics::newHighScore,
                 this, &BowlingMainWindow::onNewHighScore);
         connect(gameStatistics, &GameStatistics::newStrikeRecord,
                 this, &BowlingMainWindow::onNewStrikeRecord);
-        
+    
         // Connect 3-6-9 system
         connect(threeSixNine, &ThreeSixNineTracker::participantWon,
                 this, &BowlingMainWindow::onThreeSixNineWin);
         connect(threeSixNine, &ThreeSixNineTracker::participantAlmostWon,
                 this, &BowlingMainWindow::onThreeSixNineAlmostWin);
-        
+    
         qDebug() << "=== CONSTRUCTOR COMPLETE ===";
-        
-        // Check for game recovery on startup
+    
+        // Check for game recovery on startup (with delay to ensure everything is ready)
         QTimer::singleShot(1000, this, [this]() {
             gameRecovery->checkForRecovery(this);
         });
-    }
-
-    ~BowlingMainWindow() {
-        if (machineInterface) {
-            machineInterface->shutdown();
-            delete machineInterface;
-            machineInterface = nullptr;
-        }
     }
 
 private slots:
@@ -372,6 +369,7 @@ private slots:
         updateGameStatus();
     }
 
+
 private:
     void setupGameInterface() {
         QVBoxLayout* gameLayout = new QVBoxLayout(gameInterfaceWidget);
@@ -439,23 +437,9 @@ private:
     }
 
     void updateButtonStates() {
-        // Defensive pointer checks
-        if (!holdButton) {
-            qWarning() << "updateButtonStates: holdButton pointer is null";
-            return;
-        }
-        if (!skipButton) {
-            qWarning() << "updateButtonStates: skipButton pointer is null";
-            return;
-        }
-        if (!resetButton) {
-            qWarning() << "updateButtonStates: resetButton pointer is null";
-            return;
-        }
-
-        // Ensure pointers are widgets
-        if (!holdButton->isWidgetType() || !skipButton->isWidgetType() || !resetButton->isWidgetType()) {
-            qWarning() << "updateButtonStates: One or more button pointers are not valid QWidget types";
+        // Early return if UI not ready
+        if (!holdButton || !skipButton || !resetButton) {
+            qDebug() << "updateButtonStates: UI not fully initialized yet, skipping";
             return;
         }
 
@@ -471,7 +455,6 @@ private:
 
                 resetButton->setEnabled(false);
                 resetButton->setStyleSheet("QPushButton { background-color: #666666; color: #999999; font-size: 14px; }");
-
                 return;
             }
 
@@ -832,7 +815,10 @@ private:
         
         connect(client, &LaneClient::gameCommandReceived, this, &BowlingMainWindow::onGameCommand);
         
-        client->start();
+        // Delay connection to ensure UI is fully ready
+        QTimer::singleShot(100, this, [this]() {
+            client->start();
+        });
         
         if (laneStatusLabel) {
             laneStatusLabel->setText(QString("Lane %1").arg(laneId));
@@ -1048,6 +1034,5 @@ int main(int argc, char *argv[])
     
     return app.exec();
 }
-
 
 #include "main.moc"

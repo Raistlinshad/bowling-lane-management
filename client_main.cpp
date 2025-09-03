@@ -83,22 +83,12 @@ private slots:
             machineData["lane_settings"] = m_laneSettings;
         }
         
-        // Here you would interface with your Python machine control
-        // Example: Save game data to file for Python to read
         QJsonDocument gameDoc(machineData);
         QFile gameFile("current_game.json");
         if (gameFile.open(QIODevice::WriteOnly)) {
             gameFile.write(gameDoc.toJson());
             gameFile.close();
-        }
-        
-        // For now, just acknowledge
-        m_client->sendStatusUpdate("game_running");
-        
-        // Simulate game completion after 30 seconds
-        QTimer::singleShot(30000, this, [this]() {
-            simulateGameComplete();
-        });
+        };
     }
     
     void handleLeagueGame(const QJsonObject &data)
@@ -117,14 +107,7 @@ private slots:
         if (gameFile.open(QIODevice::WriteOnly)) {
             gameFile.write(gameDoc.toJson());
             gameFile.close();
-        }
-        
-        m_client->sendStatusUpdate("league_game_running");
-        
-        // Simulate game completion
-        QTimer::singleShot(45000, this, [this]() {
-            simulateGameComplete();
-        });
+        };
     }
     
     void handlePreBowl(const QJsonObject &data)
@@ -143,31 +126,9 @@ private slots:
         if (gameFile.open(QIODevice::WriteOnly)) {
             gameFile.write(gameDoc.toJson());
             gameFile.close();
-        }
-        
-        m_client->sendStatusUpdate("pre_bowl_running");
-        
-        // Simulate pre-bowl completion
-        QTimer::singleShot(20000, this, [this]() {
-            simulateGameComplete();
-        });
+        };
     }
-    
-    void simulateGameComplete()
-    {
-        qDebug() << "Simulating game completion";
-        
-        // Create sample game completion data
-        QJsonObject gameData;
-        gameData["lane_id"] = m_laneId;
-        gameData["status"] = "completed";
-        gameData["final_scores"] = QJsonArray{185, 167, 201};
-        gameData["total_frames"] = 10;
-        gameData["completion_time"] = QDateTime::currentDateTime().toString(Qt::ISODate);
-        
-        m_client->sendGameComplete(gameData);
-        m_client->sendStatusUpdate("ready");
-    }
+
 
 private:
     void loadSettings()
